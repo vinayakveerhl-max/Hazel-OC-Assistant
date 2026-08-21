@@ -73,7 +73,6 @@ export async function processPdfExtraction(
   inputPayload: any,
   filename: string = 'document.pdf'
 ): Promise<ExtractionResponse> {
-  // Extract base64 safely regardless of body format
   let rawString = typeof inputPayload === 'string' 
     ? inputPayload 
     : inputPayload?.pdfBase64 || inputPayload?.data || inputPayload?.base64 || '';
@@ -149,7 +148,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
-  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+  const MODELS_TO_TRY = ['gemini-3.6-flash', 'gemini-3.6-pro'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
