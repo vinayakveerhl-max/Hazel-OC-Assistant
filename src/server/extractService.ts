@@ -45,7 +45,6 @@ export interface ExtractionResponse {
   success: boolean;
   document: ExtractionDocument;
   items: ExtractionItem[];
-  // Legacy / UI bridge
   header?: {
     customerName: string;
     projectName: string;
@@ -74,7 +73,7 @@ export async function processPdfExtraction(
   inputPayload: any,
   filename: string = 'document.pdf'
 ): Promise<ExtractionResponse> {
-  // Extract and sanitize raw base64 string from incoming payload
+  // Extract base64 safely regardless of body format
   let rawString = typeof inputPayload === 'string' 
     ? inputPayload 
     : inputPayload?.pdfBase64 || inputPayload?.data || inputPayload?.base64 || '';
@@ -85,8 +84,7 @@ export async function processPdfExtraction(
     throw new Error('No valid base64 PDF data supplied in request.');
   }
 
-  console.log(`[Hazel OC] ==========================================`);
-  console.log(`[Hazel OC] 1. PDF received: "${filename}" (~${Math.round((cleanBase64.length * 0.75) / 1024)} KB)`);
+  console.log(`[Hazel OC] PDF received: "${filename}" (~${Math.round((cleanBase64.length * 0.75) / 1024)} KB)`);
 
   const ai = getGenAI();
 
@@ -151,7 +149,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
- const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
+  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
@@ -160,7 +158,6 @@ Return the final result strictly as a valid JSON object matching the requested s
 
   for (let m = 0; m < MODELS_TO_TRY.length; m++) {
     const modelName = MODELS_TO_TRY[m];
-    console.log(`[Hazel OC] 2. Gemini request started with model: "${modelName}"`);
 
     for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
       try {
@@ -176,13 +173,13 @@ Return the final result strictly as a valid JSON object matching the requested s
                 document: {
                   type: Type.OBJECT,
                   properties: {
-                    client: { type: Type.STRING, description: 'Customer or Client Name from OC' },
-                    project: { type: Type.STRING, description: 'Project Name from OC' },
-                    reference_number: { type: Type.STRING, description: 'OC Number, PO Number, Quotation Reference' },
-                    oc_date: { type: Type.STRING, description: 'Date of the Order Confirmation' },
-                    total_amount: { type: Type.STRING, description: 'Total order value if present' },
-                    prepared_by: { type: Type.STRING, description: 'Sales contact or prepared by' },
-                    notes: { type: Type.STRING, description: 'General notes, delivery schedule, or payment terms' },
+                    client: { type: Type.STRING },
+                    project: { type: Type.STRING },
+                    reference_number: { type: Type.STRING },
+                    oc_date: { type: Type.STRING },
+                    total_amount: { type: Type.STRING },
+                    prepared_by: { type: Type.STRING },
+                    notes: { type: Type.STRING },
                   },
                   required: ['client', 'project', 'reference_number', 'oc_date'],
                 },
@@ -191,28 +188,24 @@ Return the final result strictly as a valid JSON object matching the requested s
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      category: {
-                        type: Type.STRING,
-                        description: 'Category: Power Supplies, Linears, Downlights / Spotlights, Profiles, Grids, Diffusers, Connectors, Accessories / Other Items, Flexum, Svelte, Other Lighting Products',
-                      },
+                      category: { type: Type.STRING },
                       line_item_numbers: {
                         type: Type.ARRAY,
                         items: { type: Type.STRING },
-                        description: 'List of original OC line item numbers (e.g. ["1", "3"])',
                       },
-                      client_code: { type: Type.STRING, description: 'Client tag/code or empty string' },
-                      item_name: { type: Type.STRING, description: 'Luminaire model name or product title' },
-                      full_specification: { type: Type.STRING, description: 'Complete specification text summary' },
-                      wattage: { type: Type.STRING, description: 'Wattage or empty string' },
-                      cct: { type: Type.STRING, description: 'CCT (Color Temperature) or empty string' },
-                      beam_angle: { type: Type.STRING, description: 'Beam angle or empty string' },
-                      finish: { type: Type.STRING, description: 'Finish or color or empty string' },
-                      ip_rating: { type: Type.STRING, description: 'IP Rating or empty string' },
-                      length: { type: Type.STRING, description: 'Length or dimension or empty string' },
-                      driver: { type: Type.STRING, description: 'Driver / PSU spec or empty string' },
-                      quantity: { type: Type.NUMBER, description: 'Numeric total quantity' },
-                      unit: { type: Type.STRING, description: 'Unit of measurement (Nos, Mtrs, Sets, Pcs)' },
-                      comments: { type: Type.STRING, description: 'Comments or remarks or empty string' },
+                      client_code: { type: Type.STRING },
+                      item_name: { type: Type.STRING },
+                      full_specification: { type: Type.STRING },
+                      wattage: { type: Type.STRING },
+                      cct: { type: Type.STRING },
+                      beam_angle: { type: Type.STRING },
+                      finish: { type: Type.STRING },
+                      ip_rating: { type: Type.STRING },
+                      length: { type: Type.STRING },
+                      driver: { type: Type.STRING },
+                      quantity: { type: Type.NUMBER },
+                      unit: { type: Type.STRING },
+                      comments: { type: Type.STRING },
                     },
                     required: ['category', 'line_item_numbers', 'item_name', 'quantity', 'unit'],
                   },
@@ -225,20 +218,17 @@ Return the final result strictly as a valid JSON object matching the requested s
 
         responseText = response.text;
         usedModel = modelName;
-        console.log(`[Hazel OC] 3. Gemini response received from model "${modelName}"`);
         break;
       } catch (err: any) {
         lastGeminiError = err;
         const errMsg = err.message || String(err);
         const status = err.status || err.statusCode || 500;
-        console.warn(`[Hazel OC] Model "${modelName}" attempt ${attempt + 1} failed. Status: ${status}. Error: ${errMsg}`);
 
         const isRetryable =
           status === 503 ||
           status === 429 ||
           errMsg.toLowerCase().includes('503') ||
           errMsg.toLowerCase().includes('unavailable') ||
-          errMsg.toLowerCase().includes('high demand') ||
           errMsg.toLowerCase().includes('resource_exhausted') ||
           errMsg.toLowerCase().includes('rate limit');
 
@@ -247,7 +237,6 @@ Return the final result strictly as a valid JSON object matching the requested s
         }
 
         const delay = BACKOFF_MS[attempt];
-        console.log(`[Hazel OC] Backing off for ${delay}ms before retrying...`);
         await new Promise((r) => setTimeout(r, delay));
       }
     }
@@ -258,11 +247,9 @@ Return the final result strictly as a valid JSON object matching the requested s
   }
 
   if (!responseText) {
-    console.error(`[Hazel OC] Gemini request failed across all models. Last error:`, lastGeminiError);
     throw new Error(lastGeminiError?.message || 'Gemini API failed to process the PDF.');
   }
 
-  console.log(`[Hazel OC] 4. JSON parsing Gemini response...`);
   const cleaned = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
   const parsed = JSON.parse(cleaned);
 
