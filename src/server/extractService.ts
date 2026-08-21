@@ -151,7 +151,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
-  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+ const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
