@@ -63,7 +63,7 @@ export interface ExtractionResponse {
 }
 
 function getGenAI(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY environment variable is not configured.');
   }
@@ -71,9 +71,20 @@ function getGenAI(): GoogleGenAI {
 }
 
 export async function processPdfExtraction(
-  cleanBase64: string,
+  inputPayload: any,
   filename: string = 'document.pdf'
 ): Promise<ExtractionResponse> {
+  // Extract and sanitize raw base64 string from incoming payload
+  let rawString = typeof inputPayload === 'string' 
+    ? inputPayload 
+    : inputPayload?.pdfBase64 || inputPayload?.data || inputPayload?.base64 || '';
+
+  const cleanBase64 = String(rawString).replace(/^data:application\/pdf;base64,/, '').trim();
+
+  if (!cleanBase64) {
+    throw new Error('No valid base64 PDF data supplied in request.');
+  }
+
   console.log(`[Hazel OC] ==========================================`);
   console.log(`[Hazel OC] 1. PDF received: "${filename}" (~${Math.round((cleanBase64.length * 0.75) / 1024)} KB)`);
 
@@ -140,7 +151,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
-  const MODELS_TO_TRY = ['gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
+  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
@@ -149,7 +160,7 @@ Return the final result strictly as a valid JSON object matching the requested s
 
   for (let m = 0; m < MODELS_TO_TRY.length; m++) {
     const modelName = MODELS_TO_TRY[m];
-    console.log(`[Hazel OC] 2. Gemini request started with model: "${modelName}" (original application/pdf)`);
+    console.log(`[Hazel OC] 2. Gemini request started with model: "${modelName}"`);
 
     for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
       try {
@@ -214,7 +225,7 @@ Return the final result strictly as a valid JSON object matching the requested s
 
         responseText = response.text;
         usedModel = modelName;
-        console.log(`[Hazel OC] 3. Gemini response received from model "${modelName}" (length: ${responseText?.length || 0} chars)`);
+        console.log(`[Hazel OC] 3. Gemini response received from model "${modelName}"`);
         break;
       } catch (err: any) {
         lastGeminiError = err;
@@ -236,7 +247,7 @@ Return the final result strictly as a valid JSON object matching the requested s
         }
 
         const delay = BACKOFF_MS[attempt];
-        console.log(`[Hazel OC] Backing off for ${delay}ms before retrying with Gemini...`);
+        console.log(`[Hazel OC] Backing off for ${delay}ms before retrying...`);
         await new Promise((r) => setTimeout(r, delay));
       }
     }
@@ -316,9 +327,6 @@ Return the final result strictly as a valid JSON object matching the requested s
     preparedBy: document.prepared_by || '—',
     notes: document.notes || '—',
   };
-
-  console.log(`[Hazel OC] 5. final JSON returned to frontend: ${items.length} items extracted using ${usedModel}`);
-  console.log(`[Hazel OC] ==========================================`);
 
   return {
     success: true,
