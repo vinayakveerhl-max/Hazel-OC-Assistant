@@ -144,7 +144,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
-const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const MODELS_TO_TRY = ['gemini-2.5-flash'];
 
   let responseText: string | undefined;
   let usedModel = '';
