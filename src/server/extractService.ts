@@ -144,7 +144,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
-const MODELS_TO_TRY = ['gemini-3.1-pro-preview'];  const BACKOFF_MS = [2000, 4000, 8000];
+const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 
   let responseText: string | undefined;
   let usedModel = '';
