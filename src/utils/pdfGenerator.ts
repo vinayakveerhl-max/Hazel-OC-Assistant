@@ -112,24 +112,8 @@ export function generateLightingSummaryPDF(header: OCHeader, items: OCLineItem[]
 
   currentY += 28;
 
-  // Group items by category and consolidate identical specs within each category
-  const categories: LightingCategory[] = [
-    'Power Supplies',
-    'Linears',
-    'Downlights / Spotlights',
-    'Profiles',
-    'Grids',
-    'Diffusers',
-    'Connectors',
-    'Accessories / Other Items',
-    'Flexum',
-    'Svelte',
-    'Other Lighting Products',
-  ];
-
   // Helper to add table section title
   const addSectionTitle = (title: string, count: number) => {
-    // Check if we have enough space for section header + at least 2 table rows
     if (currentY > pageHeight - 35) {
       doc.addPage();
       drawHeaderBanner(false);
@@ -473,14 +457,12 @@ export function generateLightingSummaryPDF(header: OCHeader, items: OCLineItem[]
   // 7. CONSOLIDATED MATERIAL SUMMARY SECTION
   const consolidatedSummary = generateConsolidatedSummary(items);
   if (consolidatedSummary.length > 0) {
-    // New page or clear space for summary
     if (currentY > pageHeight - 45) {
       doc.addPage();
       drawHeaderBanner(false);
       currentY = 25;
     }
 
-    // Grand summary header with gold/purple theme
     doc.setFillColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
     doc.rect(margin, currentY, pageWidth - margin * 2, 7.5, 'F');
 
@@ -530,16 +512,14 @@ export function generateLightingSummaryPDF(header: OCHeader, items: OCLineItem[]
     currentY = (doc as any).lastAutoTable.finalY + 10;
   }
 
-  // Footer on all pages (Page X of Y, signoff section)
+  // Footer on all pages
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
 
-    // Footer rule line
     doc.setDrawColor(COLOR_TABLE_BORDER[0], COLOR_TABLE_BORDER[1], COLOR_TABLE_BORDER[2]);
     doc.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
 
-    // Footer text
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(COLOR_TEXT_MUTED[0], COLOR_TEXT_MUTED[1], COLOR_TEXT_MUTED[2]);
@@ -552,7 +532,19 @@ export function generateLightingSummaryPDF(header: OCHeader, items: OCLineItem[]
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 20, pageHeight - 6);
   }
 
+  // Dynamic Filename Generation with Sanitized OC Number & Project Name
+  const cleanOcNumber = (header.ocNumber || header.referenceNumber || 'OC_Summary')
+    .trim()
+    .replace(/[\/\\?%*:|"<>]/g, '-')
+    .replace(/\s+/g, '_');
+
+  const cleanProjectName = header.projectName
+    ? `_${header.projectName.trim().replace(/[\/\\?%*:|"<>]/g, '-').replace(/\s+/g, '_')}`
+    : '';
+
+  const currentDate = new Date().toISOString().slice(0, 10);
+  const filename = `Hazel_OC_${cleanOcNumber}${cleanProjectName}_${currentDate}.pdf`;
+
   // Download the generated PDF
-  const filename = `Hazel_OC_Summary_${(header.ocNumber || 'Document').replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(filename);
 }
