@@ -39,6 +39,9 @@ export interface ExtractionItem {
   originalDescription?: string;
   lineItemNumber?: string;
   itemName?: string;
+  clientCode?: string;
+  beamAngle?: string;
+  ipRating?: string;
 }
 
 export interface ExtractionResponse {
@@ -59,6 +62,10 @@ export interface ExtractionResponse {
   error?: string;
   code?: string;
   details?: string;
+}
+
+function normalizeSpec(val: any): string {
+  return String(val || '').trim().toLowerCase();
 }
 
 function getGenAI(): GoogleGenAI {
@@ -122,19 +129,8 @@ CORE EXTRACTION MANDATES:
    - comments: Mounting notes, special requests, or line remarks. Empty string if absent.
    - category: One of "Power Supplies", "Linears", "Downlights / Spotlights", "Profiles", "Grids", "Diffusers", "Connectors", "Accessories / Other Items", "Flexum", "Svelte", "Other Lighting Products".
 
-4. STRICT CONSOLIDATION RULE:
-   Only consolidate two items if their COMPLETE relevant specification is 100% identical.
-   NEVER merge:
-   - different wattages
-   - different CCTs
-   - different beam angles
-   - different lengths
-   - different finishes
-   - different IP ratings
-   - different driver specifications
-   - different profiles
-   - different product variants
-   If the exact same specification appears multiple times across the OC, combine the numeric quantities and preserve all corresponding OC line item numbers in line_item_numbers array.
+4. CONSOLIDATION RULE:
+   Group items with identical technical specifications together across different client codes into single consolidated summaries where applicable.
 
 5. ACCURACY:
    Do NOT hallucinate values. If a field is not present in the OC, return an empty string "".
@@ -249,76 +245,4 @@ Return the final result strictly as a valid JSON object matching the requested s
     throw new Error(lastGeminiError?.message || 'Gemini API failed to process the PDF.');
   }
 
-  const cleaned = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-  const parsed = JSON.parse(cleaned);
-
-  const document: ExtractionDocument = {
-    client: parsed.document?.client || '',
-    project: parsed.document?.project || '',
-    reference_number: parsed.document?.reference_number || '',
-    oc_date: parsed.document?.oc_date || '',
-    total_amount: parsed.document?.total_amount || '',
-    prepared_by: parsed.document?.prepared_by || '',
-    notes: parsed.document?.notes || '',
-  };
-
-  const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
-  const items: ExtractionItem[] = rawItems.map((item: any, idx: number) => {
-    const lineNums = Array.isArray(item.line_item_numbers)
-      ? item.line_item_numbers.map((n: any) => String(n))
-      : [String(item.line_item_numbers || idx + 1)];
-    const lineNumStr = lineNums.join(', ');
-
-    return {
-      id: `oc-item-${Date.now()}-${idx + 1}`,
-      category: item.category || 'Other Lighting Products',
-      line_item_numbers: lineNums,
-      lineItemNumber: lineNumStr,
-      client_code: item.client_code || '',
-      clientCode: item.client_code || '—',
-      item_name: item.item_name || 'Lighting Fixture',
-      itemName: item.item_name || 'Lighting Fixture',
-      productCode: item.productCode || item.client_code || '—',
-      full_specification: item.full_specification || item.item_name || '',
-      wattage: item.wattage || '',
-      cct: item.cct || '',
-      beam_angle: item.beam_angle || '',
-      beamAngle: item.beam_angle || '—',
-      finish: item.finish || '',
-      ip_rating: item.ip_rating || '',
-      ipRating: item.ip_rating || '—',
-      length: item.length || '',
-      dimensions: item.length || '—',
-      profileType: item.category === 'Profiles' ? item.item_name : '—',
-      powerSupplyType: item.category === 'Power Supplies' ? (item.driver || item.item_name) : '—',
-      driver: item.driver || '',
-      driverType: item.driver || '—',
-      dimming: item.driver?.toLowerCase().includes('dali') ? 'DALI' : item.driver?.toLowerCase().includes('dim') ? 'Dimmable' : 'Non-Dim',
-      quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
-      unit: item.unit || 'Nos',
-      comments: item.comments || '',
-      remarks: item.comments || '—',
-      originalDescription: item.full_specification || item.item_name || '',
-      cri: '',
-    };
-  });
-
-  const header = {
-    customerName: document.client || 'Customer',
-    projectName: document.project || 'Lighting Project',
-    ocNumber: document.reference_number || 'OC-' + Date.now().toString().slice(-6),
-    ocDate: document.oc_date || new Date().toLocaleDateString(),
-    referenceNumber: document.reference_number || '—',
-    totalAmount: document.total_amount || '—',
-    preparedBy: document.prepared_by || '—',
-    notes: document.notes || '—',
-  };
-
-  return {
-    success: true,
-    document,
-    items,
-    header,
-    modelUsed: usedModel,
-  };
-}
+  const cleaned = responseText.replace(/^```json\s*/i, '').replace(/\s*
