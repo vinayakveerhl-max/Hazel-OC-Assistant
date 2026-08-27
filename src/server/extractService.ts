@@ -144,7 +144,7 @@ Return the final result strictly as a valid JSON object matching the requested s
     },
   };
 
-  const MODELS_TO_TRY = ['gemini-3.6-flash', 'gemini-3.6-pro'];
+  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
@@ -245,4 +245,126 @@ Return the final result strictly as a valid JSON object matching the requested s
     throw new Error(lastGeminiError?.message || 'Gemini API failed to process the PDF.');
   }
 
-  const cleaned = responseText.replace(/^```json\s*/i, '').replace(/\s*
+  const cleaned = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+  const parsed = JSON.parse(cleaned);
+
+  const document: ExtractionDocument = {
+    client: parsed.document?.client || '',
+    project: parsed.document?.project || '',
+    reference_number: parsed.document?.reference_number || '',
+    oc_date: parsed.document?.oc_date || '',
+    total_amount: parsed.document?.total_amount || '',
+    prepared_by: parsed.document?.prepared_by || '',
+    notes: parsed.document?.notes || '',
+  };
+
+  const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+
+  const consolidatedMap = new Map<string, any>();
+
+  rawItems.forEach((item: any, idx: number) => {
+    const specKey = [
+      normalizeSpec(item.item_name),
+      normalizeSpec(item.wattage),
+      normalizeSpec(item.cct),
+      normalizeSpec(item.beam_angle),
+      normalizeSpec(item.finish),
+      normalizeSpec(item.ip_rating),
+      normalizeSpec(item.driver),
+      normalizeSpec(item.length),
+    ].join('||');
+
+    const itemLineNums = Array.isArray(item.line_item_numbers)
+      ? item.line_item_numbers.map((n: any) => String(n))
+      : [String(item.line_item_numbers || idx + 1)];
+
+    const itemQty = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
+
+    if (consolidatedMap.has(specKey)) {
+      const existing = consolidatedMap.get(specKey);
+
+      itemLineNums.forEach((num: string) => {
+        if (num && !existing.line_item_numbers.includes(num)) {
+          existing.line_item_numbers.push(num);
+        }
+      });
+
+      if (item.client_code && existing.client_code) {
+        const existingCodes = existing.client_code.split(', ');
+        if (!existingCodes.includes(item.client_code)) {
+          existing.client_code = `${existing.client_code}, ${item.client_code}`;
+        }
+      } else if (item.client_code && !existing.client_code) {
+        existing.client_code = item.client_code;
+      }
+
+      existing.quantity += itemQty;
+    } else {
+      consolidatedMap.set(specKey, {
+        ...item,
+        line_item_numbers: itemLineNums,
+        client_code: item.client_code || '',
+        quantity: itemQty,
+      });
+    }
+  });
+
+  const consolidatedRawItems = Array.from(consolidatedMap.values());
+
+  const items: ExtractionItem[] = consolidatedRawItems.map((item: any, idx: number) => {
+    const lineNums = item.line_item_numbers;
+    const lineNumStr = lineNums.join(', ');
+
+    return {
+      id: `oc-item-${Date.now()}-${idx + 1}`,
+      category: item.category || 'Other Lighting Products',
+      line_item_numbers: lineNums,
+      lineItemNumber: lineNumStr,
+      client_code: item.client_code || '',
+      clientCode: item.client_code || '—',
+      item_name: item.item_name || 'Lighting Fixture',
+      itemName: item.item_name || 'Lighting Fixture',
+      productCode: item.productCode || item.client_code || '—',
+      full_specification: item.full_specification || item.item_name || '',
+      wattage: item.wattage || '',
+      cct: item.cct || '',
+      beam_angle: item.beam_angle || '',
+      beamAngle: item.beam_angle || '—',
+      finish: item.finish || '',
+      ip_rating: item.ip_rating || '',
+      ipRating: item.ip_rating || '—',
+      length: item.length || '',
+      dimensions: item.length || '—',
+      profileType: item.category === 'Profiles' ? item.item_name : '—',
+      powerSupplyType: item.category === 'Power Supplies' ? (item.driver || item.item_name) : '—',
+      driver: item.driver || '',
+      driverType: item.driver || '—',
+      dimming: item.driver?.toLowerCase().includes('dali') ? 'DALI' : item.driver?.toLowerCase().includes('dim') ? 'Dimmable' : 'Non-Dim',
+      quantity: item.quantity,
+      unit: item.unit || 'Nos',
+      comments: item.comments || '',
+      remarks: item.comments || '—',
+      originalDescription: item.full_specification || item.item_name || '',
+      cri: '',
+    };
+  });
+
+  const header = {
+    customerName: document.client || 'Customer',
+    projectName: document.project || 'Lighting Project',
+    ocNumber: document.reference_number || 'OC-' + Date.now().toString().slice(-6),
+    ocDate: document.oc_date || new Date().toLocaleDateString(),
+    referenceNumber: document.reference_number || '—',
+    totalAmount: document.total_amount || '—',
+    preparedBy: document.prepared_by || '—',
+    notes: document.notes || '—',
+  };
+
+  return {
+    success: true,
+    document,
+    items,
+    header,
+    modelUsed: usedModel,
+  };
+}
