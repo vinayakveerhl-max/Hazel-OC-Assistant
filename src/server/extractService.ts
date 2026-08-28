@@ -63,7 +63,7 @@ export interface ExtractionResponse {
   details?: string;
 }
 
-// Helper to sanitize extracted strings and strip OCR/footer noise
+// Sanitization helpers to strip OCR artifacts and loop values
 function cleanText(val: any): string {
   if (!val) return '';
   let str = String(val).trim();
@@ -78,7 +78,6 @@ function cleanText(val: any): string {
   return str.replace(/\s+/g, ' ').trim();
 }
 
-// Clean wattage specifically to prevent loop artifacts
 function cleanWattage(val: any): string {
   if (!val) return '';
   const str = String(val).trim();
@@ -113,14 +112,13 @@ export async function processPdfExtraction(
 
   const ai = getGenAI();
 
-  // Strict prompt to stop raw OCR/footer leakage
   const extractionPrompt = `You are a high-precision Lighting Order Confirmation (OC) Document Intelligence Engine.
-Extract all line items and header details from this document.
+Extract all line items and header details accurately from this document.
 
 STRICT INSTRUCTIONS:
 1. Ignore page footers, payment terms, bank account details, GSTIN, tax breakdowns, vendor legal terms, or system URLs (e.g., letstranzact.com).
 2. Do NOT inject raw document footer text into full_specification or comments.
-3. Keep specifications, wattage (e.g., 8W), CCT, beam angle, and finish clean and concise. Do NOT repeat wattage values multiple times.
+3. Keep specifications, wattage (e.g., 8W), CCT, beam angle, and finish clean and concise. Do NOT repeat wattage values.
 4. Return strictly valid JSON adhering to the provided schema.`;
 
   const pdfPart = {
@@ -130,8 +128,8 @@ STRICT INSTRUCTIONS:
     },
   };
 
-  // Modern, valid Gemini models
-  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  // Set to gemini-3.6-flash as required by API
+  const MODELS_TO_TRY = ['gemini-3.6-flash'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
@@ -250,7 +248,7 @@ STRICT INSTRUCTIONS:
   const items: ExtractionItem[] = rawItems.map((item: any, idx: number) => {
     const lineNums = Array.isArray(item.line_item_numbers) ? item.line_item_numbers : [String(idx + 1)];
     const lineNumStr = lineNums.join(', ');
-    
+
     const rawWattage = cleanWattage(item.wattage);
     const rawSpec = cleanText(item.full_specification || item.item_name || '');
     const rawClientCode = cleanText(item.client_code);
