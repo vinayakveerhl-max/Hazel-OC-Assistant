@@ -63,8 +63,30 @@ export interface ExtractionResponse {
   details?: string;
 }
 
-function normalizeSpec(val: any): string {
-  return String(val || '').trim().toLowerCase();
+// Helper to sanitize extracted strings and strip OCR/footer noise
+function cleanText(val: any): string {
+  if (!val) return '';
+  let str = String(val).trim();
+  
+  // Strip URLs (e.g. letstranzact.com)
+  str = str.replace(/https?:\/\/[^\s]+/gi, '');
+  // Strip metadata & bank headers if present in strings
+  str = str.replace(/(GSTIN|Bank Details|Kotak Mahindra|Authorised Signatory|Page \d+ of \d+)[^\n]*/gi, '');
+  // Fix repeating string loops (e.g., 8W8W8W...)
+  str = str.replace(/(8W){2,}/gi, '8W');
+  
+  return str.replace(/\s+/g, ' ').trim();
+}
+
+// Clean wattage specifically to prevent loop artifacts
+function cleanWattage(val: any): string {
+  if (!val) return '';
+  const str = String(val).trim();
+  const match = str.match(/\b\d+(\.\d+)?\s*W\b/i);
+  if (match) {
+    return match[0].toUpperCase().replace(/\s+/, '');
+  }
+  return str.replace(/(8W){2,}/gi, '8W').trim();
 }
 
 function getGenAI(): GoogleGenAI {
@@ -91,8 +113,15 @@ export async function processPdfExtraction(
 
   const ai = getGenAI();
 
+  // Strict prompt to stop raw OCR/footer leakage
   const extractionPrompt = `You are a high-precision Lighting Order Confirmation (OC) Document Intelligence Engine.
-Extract all line items and document details accurately. Return strictly valid JSON.`;
+Extract all line items and header details from this document.
+
+STRICT INSTRUCTIONS:
+1. Ignore page footers, payment terms, bank account details, GSTIN, tax breakdowns, vendor legal terms, or system URLs (e.g., letstranzact.com).
+2. Do NOT inject raw document footer text into full_specification or comments.
+3. Keep specifications, wattage (e.g., 8W), CCT, beam angle, and finish clean and concise. Do NOT repeat wattage values multiple times.
+4. Return strictly valid JSON adhering to the provided schema.`;
 
   const pdfPart = {
     inlineData: {
@@ -101,7 +130,8 @@ Extract all line items and document details accurately. Return strictly valid JS
     },
   };
 
-  const MODELS_TO_TRY = ['gemini-3.6-flash'];
+  // Modern, valid Gemini models
+  const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.0-flash'];
   const BACKOFF_MS = [2000, 4000, 8000];
 
   let responseText: string | undefined;
@@ -206,13 +236,13 @@ Extract all line items and document details accurately. Return strictly valid JS
   const parsed = JSON.parse(cleaned);
 
   const document: ExtractionDocument = {
-    client: parsed.document?.client || '',
-    project: parsed.document?.project || '',
-    reference_number: parsed.document?.reference_number || '',
-    oc_date: parsed.document?.oc_date || '',
-    total_amount: parsed.document?.total_amount || '',
-    prepared_by: parsed.document?.prepared_by || '',
-    notes: parsed.document?.notes || '',
+    client: cleanText(parsed.document?.client),
+    project: cleanText(parsed.document?.project),
+    reference_number: cleanText(parsed.document?.reference_number),
+    oc_date: cleanText(parsed.document?.oc_date),
+    total_amount: cleanText(parsed.document?.total_amount),
+    prepared_by: cleanText(parsed.document?.prepared_by),
+    notes: cleanText(parsed.document?.notes),
   };
 
   const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
@@ -220,37 +250,44 @@ Extract all line items and document details accurately. Return strictly valid JS
   const items: ExtractionItem[] = rawItems.map((item: any, idx: number) => {
     const lineNums = Array.isArray(item.line_item_numbers) ? item.line_item_numbers : [String(idx + 1)];
     const lineNumStr = lineNums.join(', ');
+    
+    const rawWattage = cleanWattage(item.wattage);
+    const rawSpec = cleanText(item.full_specification || item.item_name || '');
+    const rawClientCode = cleanText(item.client_code);
+    const rawItemName = cleanText(item.item_name);
+    const rawCategory = cleanText(item.category) || 'Other Lighting Products';
+    const rawComments = cleanText(item.comments);
 
     return {
       id: `oc-item-${Date.now()}-${idx + 1}`,
-      category: item.category || 'Other Lighting Products',
+      category: rawCategory,
       line_item_numbers: lineNums,
       lineItemNumber: lineNumStr,
-      client_code: item.client_code || '',
-      clientCode: item.client_code || '—',
-      item_name: item.item_name || 'Lighting Fixture',
-      itemName: item.item_name || 'Lighting Fixture',
-      productCode: item.client_code || '—',
-      full_specification: item.full_specification || item.item_name || '',
-      wattage: item.wattage || '',
-      cct: item.cct || '',
-      beam_angle: item.beam_angle || '',
-      beamAngle: item.beam_angle || '—',
-      finish: item.finish || '',
-      ip_rating: item.ip_rating || '',
-      ipRating: item.ip_rating || '—',
-      length: item.length || '',
-      dimensions: item.length || '—',
-      profileType: item.category === 'Profiles' ? item.item_name : '—',
-      powerSupplyType: item.category === 'Power Supplies' ? (item.driver || item.item_name) : '—',
-      driver: item.driver || '',
-      driverType: item.driver || '—',
+      client_code: rawClientCode,
+      clientCode: rawClientCode || '—',
+      item_name: rawItemName || 'Lighting Fixture',
+      itemName: rawItemName || 'Lighting Fixture',
+      productCode: rawClientCode || '—',
+      full_specification: rawSpec,
+      wattage: rawWattage,
+      cct: cleanText(item.cct),
+      beam_angle: cleanText(item.beam_angle),
+      beamAngle: cleanText(item.beam_angle) || '—',
+      finish: cleanText(item.finish),
+      ip_rating: cleanText(item.ip_rating),
+      ipRating: cleanText(item.ip_rating) || '—',
+      length: cleanText(item.length),
+      dimensions: cleanText(item.length) || '—',
+      profileType: rawCategory === 'Profiles' ? rawItemName : '—',
+      powerSupplyType: rawCategory === 'Power Supplies' ? cleanText(item.driver || item.item_name) : '—',
+      driver: cleanText(item.driver),
+      driverType: cleanText(item.driver) || '—',
       dimming: item.driver?.toLowerCase().includes('dali') ? 'DALI' : item.driver?.toLowerCase().includes('dim') ? 'Dimmable' : 'Non-Dim',
       quantity: typeof item.quantity === 'number' ? item.quantity : 1,
-      unit: item.unit || 'Nos',
-      comments: item.comments || '',
-      remarks: item.comments || '—',
-      originalDescription: item.full_specification || item.item_name || '',
+      unit: cleanText(item.unit) || 'Nos',
+      comments: rawComments,
+      remarks: rawComments || '—',
+      originalDescription: rawSpec,
       cri: '',
     };
   });
