@@ -557,7 +557,12 @@ export const OCMaterialSummaryDocument: React.FC<OCMaterialSummaryDocumentProps>
                 <td className="text-center font-mono font-semibold text-slate-900 bg-slate-50">
                   {item.lineItemNumbers || '—'}
                 </td>
-                <td className="font-medium text-slate-900">{item.itemName}</td>
+                <td className="font-medium text-slate-900">
+                  <div>{item.itemName}</div>
+                  {item.specification && item.specification !== item.itemName && (
+                    <div className="text-[11px] text-slate-500 font-normal">{item.specification}</div>
+                  )}
+                </td>
                 <td className="text-center font-mono text-slate-700">{item.clientCode || '—'}</td>
                 <td className="text-center font-bold text-slate-900">
                   {item.totalQuantity} {item.unit}

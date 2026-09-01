@@ -95,9 +95,11 @@ export const ConsolidatedSummaryTable: React.FC<ConsolidatedSummaryTableProps> =
                       </span>
                     )}
                   </div>
-                  <p className="text-purple-200/90 leading-relaxed text-[11.5px] break-words">
-                    {item.specification}
-                  </p>
+                  {item.specification && item.specification !== item.itemName && (
+                    <p className="text-purple-200/90 leading-relaxed text-[11.5px] break-words">
+                      {item.specification}
+                    </p>
+                  )}
                 </td>
                 <td className="py-3.5 px-3 text-left font-mono font-semibold text-purple-200">
                   <span className="break-words inline-block max-w-[130px]">
