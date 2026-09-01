@@ -71,9 +71,35 @@ function getGenAI(): GoogleGenAI {
 }
 
 export async function processPdfExtraction(
-  cleanBase64: string,
-  filename: string = 'document.pdf'
+  input: string | Buffer | { pdfBase64?: string; base64?: string; data?: string; filename?: string },
+  defaultFilename: string = 'document.pdf'
 ): Promise<ExtractionResponse> {
+  // 1. Extract raw string from various input types
+  let rawBase64 = '';
+  let filename = defaultFilename;
+
+  if (typeof input === 'string') {
+    rawBase64 = input;
+  } else if (Buffer.isBuffer(input)) {
+    rawBase64 = input.toString('base64');
+  } else if (input && typeof input === 'object') {
+    rawBase64 = input.pdfBase64 || input.base64 || input.data || '';
+    if (input.filename) {
+      filename = input.filename;
+    }
+  }
+
+  if (typeof rawBase64 !== 'string' || !rawBase64.trim()) {
+    throw new Error('Invalid or empty PDF data provided. Expected a valid base64-encoded PDF string.');
+  }
+
+  // 2. Strictly clean data URI prefix to ensure raw scalar base64 string
+  const cleanBase64 = String(rawBase64).replace(/^data:.*?;base64,/, '').trim();
+
+  if (!cleanBase64) {
+    throw new Error('Base64 extraction failed. PDF data is empty after stripping URI header.');
+  }
+
   console.log(`[Hazel OC] ==========================================`);
   console.log(`[Hazel OC] 1. PDF received: "${filename}" (~${Math.round((cleanBase64.length * 0.75) / 1024)} KB)`);
 

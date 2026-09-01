@@ -6,7 +6,18 @@ import { processPdfExtraction } from '../src/server/extractService';
  * Always forces response headers to application/json and catches errors
  */
 export default async function handler(req: Request, res: Response) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({
@@ -17,19 +28,16 @@ export default async function handler(req: Request, res: Response) {
   }
 
   try {
-    const { pdfBase64, filename } = req.body || {};
-    const originalFilename = filename || 'document.pdf';
-
-    if (!pdfBase64 || typeof pdfBase64 !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'No PDF data received. Please provide valid base64-encoded PDF data.',
-        code: 'MISSING_PDF_PAYLOAD',
-      });
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        // body may be raw base64 string
+      }
     }
 
-    const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
-    const result = await processPdfExtraction(cleanBase64, originalFilename);
+    const result = await processPdfExtraction(body);
     return res.status(200).json(result);
   } catch (err: any) {
     console.error('[API /api/extract] Extraction failure:', err);

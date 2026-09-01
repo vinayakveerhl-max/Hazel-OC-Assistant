@@ -3,9 +3,9 @@ import { OCHeader, OCLineItem } from '../types';
 
 // Initialize Gemini API client using key from environment variables
 const apiKey =
-  import.meta.env.VITE_GEMINI_API_KEY ||
-  process.env.REACT_APP_GEMINI_API_KEY ||
-  process.env.GEMINI_API_KEY ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
+  (typeof process !== 'undefined' && process.env?.REACT_APP_GEMINI_API_KEY) ||
+  (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
   '';
 
 const ai = new GoogleGenAI({ apiKey });
