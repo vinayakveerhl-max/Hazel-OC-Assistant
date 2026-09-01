@@ -13,12 +13,14 @@ interface ItemEditorModalProps {
 const CATEGORIES: LightingCategory[] = [
   'Power Supplies',
   'Linears',
-  'Downlights / Spotlights',
   'Profiles',
+  'Downlights & Spotlights',
+  'Downlights / Spotlights',
   'Grids',
   'Diffusers',
   'Connectors',
   'Accessories / Other Items',
+  'Freight & Exclusions',
   'Flexum',
   'Svelte',
   'Other Lighting Products',
@@ -27,7 +29,7 @@ const CATEGORIES: LightingCategory[] = [
 export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
   isOpen,
   item,
-  defaultCategory = 'Downlights / Spotlights',
+  defaultCategory = 'Downlights & Spotlights',
   onSave,
   onClose,
 }) => {
@@ -50,10 +52,12 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
     powerSupplyType: '—',
     driverType: '—',
     dimming: '—',
+    connection: 'Remote',
     quantity: 1,
     unit: 'Nos',
     remarks: '—',
     originalDescription: '',
+    isExcluded: false,
     confidence: 'high',
     uncertainFields: [],
   });
@@ -81,10 +85,12 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
         powerSupplyType: '',
         driverType: '',
         dimming: '',
+        connection: 'Remote',
         quantity: 1,
         unit: 'Nos',
         remarks: '',
         originalDescription: '',
+        isExcluded: defaultCategory === 'Freight & Exclusions',
         confidence: 'high',
         uncertainFields: [],
       });
@@ -150,7 +156,14 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
               <label className="block font-medium text-purple-300 mb-1">Category *</label>
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value as LightingCategory })}
+                onChange={(e) => {
+                  const cat = e.target.value as LightingCategory;
+                  setFormData({
+                    ...formData,
+                    category: cat,
+                    isExcluded: cat === 'Freight & Exclusions',
+                  });
+                }}
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               >
                 {CATEGORIES.map((cat) => (
@@ -179,7 +192,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.clientCode}
                 onChange={(e) => setFormData({ ...formData, clientCode: e.target.value })}
-                placeholder="e.g. DL-01, LIN-COVE"
+                placeholder="e.g. CL-1, DL-01"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -194,7 +207,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 required
                 value={formData.itemName}
                 onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                placeholder="e.g. Aura COB Downlight, Svelte Linear"
+                placeholder="e.g. Svelte 12 Coveline 2045 Linear, 24V-100W Power Supply"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -205,7 +218,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.productCode}
                 onChange={(e) => setFormData({ ...formData, productCode: e.target.value })}
-                placeholder="e.g. AUR-DL-15W-30K"
+                placeholder="e.g. SV-12-COVE-2045-27K"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white font-mono focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -219,7 +232,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.wattage}
                 onChange={(e) => setFormData({ ...formData, wattage: e.target.value })}
-                placeholder="e.g. 12W, 14.4W/M"
+                placeholder="e.g. 12W, 6W, 100W"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -230,7 +243,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.cct}
                 onChange={(e) => setFormData({ ...formData, cct: e.target.value })}
-                placeholder="e.g. 3000K, 4000K"
+                placeholder="e.g. 2700K, 3000K, 4000K"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -252,7 +265,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.beamAngle}
                 onChange={(e) => setFormData({ ...formData, beamAngle: e.target.value })}
-                placeholder="e.g. 24°, 36°, 120°"
+                placeholder="e.g. 120°, 24°, 36°"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -266,7 +279,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.finish}
                 onChange={(e) => setFormData({ ...formData, finish: e.target.value })}
-                placeholder="e.g. Matt Black, White"
+                placeholder="e.g. Anodized Aluminum, White"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -288,7 +301,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.dimensions}
                 onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
-                placeholder="e.g. Dia 85mm, 50x35mm"
+                placeholder="e.g. W19.2 x H19.2, PCB 8mm"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -299,21 +312,21 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.length}
                 onChange={(e) => setFormData({ ...formData, length: e.target.value })}
-                placeholder="e.g. 1200mm, 3000mm"
+                placeholder="e.g. 220.50 Mtr, 3000mm"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
           </div>
 
-          {/* Row 5: Power Supply & Driver & Dimming */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Row 5: Power Supply & Driver & Dimming & Connection */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label className="block font-medium text-purple-300 mb-1">Power Supply / Type</label>
               <input
                 type="text"
                 value={formData.powerSupplyType}
                 onChange={(e) => setFormData({ ...formData, powerSupplyType: e.target.value })}
-                placeholder="e.g. Constant Voltage 24V"
+                placeholder="e.g. 24V-100W Non-Dim"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -324,9 +337,23 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.driverType}
                 onChange={(e) => setFormData({ ...formData, driverType: e.target.value })}
-                placeholder="e.g. Meanwell HLG-240H, Tridonic"
+                placeholder="e.g. Constant Voltage 24V"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
+            </div>
+
+            <div>
+              <label className="block font-medium text-purple-300 mb-1">Connection</label>
+              <select
+                value={formData.connection || 'Remote'}
+                onChange={(e) => setFormData({ ...formData, connection: e.target.value })}
+                className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
+              >
+                <option value="Remote">Remote</option>
+                <option value="Integral">Integral</option>
+                <option value="Plug & Play">Plug &amp; Play</option>
+                <option value="Hardwired">Hardwired</option>
+              </select>
             </div>
 
             <div>
@@ -335,7 +362,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.dimming}
                 onChange={(e) => setFormData({ ...formData, dimming: e.target.value })}
-                placeholder="e.g. Non-Dim, DALI 2, Phase Cut"
+                placeholder="e.g. Non-Dim, 24V, DALI 2"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -348,7 +375,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
               <input
                 type="number"
                 required
-                min="0.1"
+                min="0.01"
                 step="any"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
@@ -363,7 +390,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 required
                 value={formData.unit}
                 onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                placeholder="e.g. Nos, Mtrs, Sets, Pairs"
+                placeholder="e.g. Nos, Mtr, Sets, Pairs"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -374,22 +401,37 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 type="text"
                 value={formData.profileType}
                 onChange={(e) => setFormData({ ...formData, profileType: e.target.value })}
-                placeholder="e.g. Recessed Trimless, Surface"
+                placeholder="e.g. ACLAP Triangle 05 Mounting Profile"
                 className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
               />
             </div>
           </div>
 
-          {/* Row 7: Remarks */}
-          <div>
-            <label className="block font-medium text-purple-300 mb-1">Remarks / Mounting Notes</label>
-            <input
-              type="text"
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-              placeholder="e.g. Includes honeycomb louver, 3 spring clips per meter"
-              className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
-            />
+          {/* Row 7: Remarks & Freight Exclusion checkbox */}
+          <div className="space-y-2">
+            <div>
+              <label className="block font-medium text-purple-300 mb-1">Remarks / Mounting Notes</label>
+              <input
+                type="text"
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                placeholder="e.g. 12W, 2700K, 120°, 24V, IP20, PCB 8mm"
+                className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2 pt-1">
+              <input
+                type="checkbox"
+                id="is-excluded-checkbox"
+                checked={formData.isExcluded || formData.category === 'Freight & Exclusions'}
+                onChange={(e) => setFormData({ ...formData, isExcluded: e.target.checked })}
+                className="w-4 h-4 rounded border-purple-800 bg-[#1B142D] text-amber-400 focus:ring-amber-400"
+              />
+              <label htmlFor="is-excluded-checkbox" className="text-purple-300 font-medium cursor-pointer">
+                Exclude from technical consolidation (e.g. Freight, Transit Insurance, Packaging)
+              </label>
+            </div>
           </div>
 
           {/* Modal Footer */}

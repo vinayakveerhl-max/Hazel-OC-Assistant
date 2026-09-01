@@ -4,7 +4,9 @@ import { UploadZone } from './components/UploadZone';
 import { OCMetadataCard } from './components/OCMetadataCard';
 import { CategoryTable } from './components/CategoryTable';
 import { ConsolidatedSummaryTable } from './components/ConsolidatedSummaryTable';
+import { OCMaterialSummaryDocument } from './components/OCMaterialSummaryDocument';
 import { ItemEditorModal } from './components/ItemEditorModal';
+import { PdfPreviewModal } from './components/PdfPreviewModal';
 import { ExtractedOCResult, OCHeader, OCLineItem, LightingCategory } from './types';
 import { generateLightingSummaryPDF } from './utils/pdfGenerator';
 import {
@@ -18,21 +20,26 @@ import {
   Filter,
   Plus,
   RefreshCw,
+  Eye,
+  FileText,
+  LayoutGrid,
 } from 'lucide-react';
 
 export default function App() {
   const [ocData, setOcData] = useState<ExtractedOCResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'document' | 'matrix'>('document');
   const [isConsolidatedView, setIsConsolidatedView] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
 
-  // Item Modal state
+  // Modal states
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<OCLineItem | null>(null);
-  const [defaultAddCategory, setDefaultAddCategory] = useState<LightingCategory>('Downlights / Spotlights');
+  const [defaultAddCategory, setDefaultAddCategory] = useState<LightingCategory>('Downlights & Spotlights');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
 
   // Header update handler
   const handleUpdateHeader = (updatedHeader: OCHeader) => {
@@ -85,11 +92,11 @@ export default function App() {
   };
 
   // Generate and Download PDF
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
     if (!ocData || ocData.items.length === 0) return;
     setIsGeneratingPDF(true);
     try {
-      generateLightingSummaryPDF(ocData.header, ocData.items);
+      await generateLightingSummaryPDF(ocData.header, ocData.items);
     } catch (err: any) {
       console.error('PDF Generation Error:', err);
       alert('Error generating PDF: ' + (err.message || 'Unknown error'));
@@ -126,7 +133,23 @@ export default function App() {
     }
 
     if (selectedCategoryFilter !== 'ALL') {
-      items = items.filter((i) => i.category === selectedCategoryFilter);
+      items = items.filter((i) => {
+        if (selectedCategoryFilter === 'Linears') {
+          return i.category === 'Linears' || i.category === 'Flexum' || i.category === 'Svelte';
+        }
+        if (selectedCategoryFilter === 'Downlights & Spotlights' || selectedCategoryFilter === 'Downlights / Spotlights') {
+          return (
+            i.category === 'Downlights & Spotlights' ||
+            i.category === 'Downlights / Spotlights' ||
+            (i.category as any) === 'Downlights' ||
+            (i.category as any) === 'Spotlights'
+          );
+        }
+        if (selectedCategoryFilter === 'Power Supplies') {
+          return i.category === 'Power Supplies' || (i.category as any) === 'LED Drivers';
+        }
+        return i.category === selectedCategoryFilter;
+      });
     }
 
     return items;
@@ -137,16 +160,14 @@ export default function App() {
   // Defined Category sections according to requirements
   const categorySections = [
     { title: 'Power Supplies & Drivers', key: 'Power Supplies' as LightingCategory },
-    { title: 'Linear Lighting', key: 'Linears' as LightingCategory },
-    { title: 'Downlights & Spotlights', key: 'Downlights / Spotlights' as LightingCategory },
-    { title: 'Flexum Strips', key: 'Flexum' as LightingCategory },
-    { title: 'Svelte Fixtures', key: 'Svelte' as LightingCategory },
+    { title: 'Linear Lighting (Svelte, Flexum, Coveline)', key: 'Linears' as LightingCategory },
+    { title: 'Downlights & Spotlights', key: 'Downlights & Spotlights' as LightingCategory },
     { title: 'Aluminum Profiles & Extrusions', key: 'Profiles' as LightingCategory },
     { title: 'Grids & Louvers', key: 'Grids' as LightingCategory },
     { title: 'Diffusers', key: 'Diffusers' as LightingCategory },
     { title: 'Connectors & Joiners', key: 'Connectors' as LightingCategory },
     { title: 'Accessories & Mounting Hardware', key: 'Accessories / Other Items' as LightingCategory },
-    { title: 'Other Lighting Products', key: 'Other Lighting Products' as LightingCategory },
+    { title: 'Freight & Exclusions', key: 'Freight & Exclusions' as LightingCategory },
   ];
 
   return (
@@ -155,6 +176,7 @@ export default function App() {
       <Header
         hasData={Boolean(ocData)}
         onGeneratePDF={handleGeneratePDF}
+        onPreviewPDF={() => setIsPdfPreviewOpen(true)}
         onReset={handleReset}
         isGenerating={isGeneratingPDF}
       />
@@ -181,31 +203,43 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold font-serif text-white tracking-wide">
-                    Review Extracted Lighting Specifications
+                    {ocData.header.projectName ? `${ocData.header.projectName} Summary` : 'Order Confirmation Material Summary'}
                   </h2>
                   <p className="text-xs text-purple-300/70">
-                    Verify line items, edit quantities or remarks, and generate the executive PDF report
+                    Verify material line items, consolidation groups, and export clean executive document
                   </p>
                 </div>
               </div>
 
-              {/* View Controls */}
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Consolidation Toggle */}
-                <button
-                  id="toggle-consolidation-btn"
-                  onClick={() => setIsConsolidatedView(!isConsolidatedView)}
-                  className={`inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                    isConsolidatedView
-                      ? 'bg-amber-400/10 border-amber-400/50 text-amber-300 shadow-inner'
-                      : 'bg-purple-950/60 border-purple-800/60 text-purple-300 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpDown className="w-3.5 h-3.5" />
-                  <span>
-                    {isConsolidatedView ? 'Consolidated View (Active)' : 'Raw Line Items View'}
-                  </span>
-                </button>
+              {/* View & Export Controls */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* View Switcher: Document Layout vs Dark Matrix */}
+                <div className="flex items-center bg-[#181126] p-1 rounded-xl border border-purple-900/60">
+                  <button
+                    onClick={() => setViewMode('document')}
+                    className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      viewMode === 'document'
+                        ? 'bg-amber-400 text-slate-950 shadow'
+                        : 'text-purple-300 hover:text-white'
+                    }`}
+                    title="Clean Document Layout (As per PDF specification)"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Summary Page</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('matrix')}
+                    className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      viewMode === 'matrix'
+                        ? 'bg-amber-400 text-slate-950 shadow'
+                        : 'text-purple-300 hover:text-white'
+                    }`}
+                    title="Interactive Category Matrix"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Studio Matrix</span>
+                  </button>
+                </div>
 
                 {/* Add Item Button */}
                 <button
@@ -217,20 +251,30 @@ export default function App() {
                   <span>Add Line Item</span>
                 </button>
 
+                {/* Preview PDF Button */}
+                <button
+                  id="preview-pdf-toolbar-btn"
+                  onClick={() => setIsPdfPreviewOpen(true)}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-semibold text-xs transition-colors shadow-sm"
+                >
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  <span>Preview PDF</span>
+                </button>
+
                 {/* Generate PDF Main Button */}
                 <button
                   id="generate-pdf-btn"
                   onClick={handleGeneratePDF}
                   disabled={isGeneratingPDF}
-                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-950/50 transition-all transform active:scale-98 disabled:opacity-50"
+                  className="inline-flex items-center space-x-2 px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-950/50 transition-all transform active:scale-98 disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
-                  <span>{isGeneratingPDF ? 'Compiling PDF...' : 'Generate PDF Summary'}</span>
+                  <span>{isGeneratingPDF ? 'Compiling PDF...' : 'Download PDF'}</span>
                 </button>
               </div>
             </div>
 
-            {/* OC Metadata Card */}
+            {/* OC Metadata Card (Header details editor) */}
             <OCMetadataCard
               header={ocData.header}
               onChangeHeader={handleUpdateHeader}
@@ -243,7 +287,7 @@ export default function App() {
               <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 text-xs text-amber-200/90 space-y-1">
                 <div className="flex items-center space-x-2 font-bold text-amber-300">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Extraction Notice & Specification Flags</span>
+                  <span>Extraction Notice &amp; Specification Flags</span>
                 </div>
                 <ul className="list-disc list-inside space-y-0.5 text-amber-200/80">
                   {ocData.warnings.map((w, idx) => (
@@ -253,74 +297,160 @@ export default function App() {
               </div>
             )}
 
-            {/* Search & Filter Toolbar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 text-purple-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search item, wattage, CCT, line #..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-[#130E20] border border-purple-900/80 rounded-xl text-xs text-white placeholder-purple-400/60 focus:outline-none focus:border-amber-400"
+            {/* DOCUMENT VIEW: Exact HTML/CSS layout template requested */}
+            {viewMode === 'document' ? (
+              <div className="space-y-6">
+                <OCMaterialSummaryDocument
+                  header={ocData.header}
+                  items={ocData.items}
+                  onEditItem={handleOpenEditModal}
+                  onDeleteItem={handleDeleteItem}
+                  onAddItem={handleOpenAddModal}
+                  isEditable={true}
                 />
               </div>
+            ) : (
+              /* STUDIO MATRIX VIEW: Searchable categories + Consolidated table */
+              <div className="space-y-6">
+                {/* Search & Filter Toolbar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                  <div className="relative w-full sm:w-80">
+                    <Search className="w-4 h-4 text-purple-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search item, wattage, CCT, line #..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-[#130E20] border border-purple-900/80 rounded-xl text-xs text-white placeholder-purple-400/60 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
 
-              {/* Category Filter Pills */}
-              <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs">
-                <button
-                  onClick={() => setSelectedCategoryFilter('ALL')}
-                  className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                    selectedCategoryFilter === 'ALL'
-                      ? 'bg-amber-400 text-slate-950 font-bold'
-                      : 'bg-purple-950/60 text-purple-300 hover:text-white border border-purple-900/60'
-                  }`}
-                >
-                  All Categories ({ocData.items.length})
-                </button>
-              </div>
-            </div>
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs scrollbar-none">
+                    <button
+                      onClick={() => setSelectedCategoryFilter('ALL')}
+                      className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                        selectedCategoryFilter === 'ALL'
+                          ? 'bg-amber-400 text-slate-950 font-bold shadow-sm'
+                          : 'bg-purple-950/60 text-purple-300 hover:text-white border border-purple-900/60'
+                      }`}
+                    >
+                      All Categories ({ocData.items.length})
+                    </button>
+                    {categorySections
+                      .filter((sec) =>
+                        ocData.items.some((item) => {
+                          if (sec.key === 'Linears') {
+                            return item.category === 'Linears' || item.category === 'Flexum' || item.category === 'Svelte';
+                          }
+                          if (sec.key === 'Downlights & Spotlights') {
+                            return (
+                              item.category === 'Downlights & Spotlights' ||
+                              item.category === 'Downlights / Spotlights' ||
+                              (item.category as any) === 'Downlights' ||
+                              (item.category as any) === 'Spotlights'
+                            );
+                          }
+                          if (sec.key === 'Power Supplies') {
+                            return (
+                              item.category === 'Power Supplies' ||
+                              (item.category as any) === 'LED Drivers'
+                            );
+                          }
+                          return item.category === sec.key;
+                        })
+                      )
+                      .map((sec) => {
+                        const count = ocData.items.filter((item) => {
+                          if (sec.key === 'Linears') {
+                            return item.category === 'Linears' || item.category === 'Flexum' || item.category === 'Svelte';
+                          }
+                          if (sec.key === 'Downlights & Spotlights') {
+                            return (
+                              item.category === 'Downlights & Spotlights' ||
+                              item.category === 'Downlights / Spotlights' ||
+                              (item.category as any) === 'Downlights' ||
+                              (item.category as any) === 'Spotlights'
+                            );
+                          }
+                          if (sec.key === 'Power Supplies') {
+                            return (
+                              item.category === 'Power Supplies' ||
+                              (item.category as any) === 'LED Drivers'
+                            );
+                          }
+                          return item.category === sec.key;
+                        }).length;
 
-            {/* Category Tables */}
-            <div className="space-y-6">
-              {categorySections.map((section) => {
-                const catItems = filteredItems.filter((item) => {
-                  if (section.key === 'Linears') {
-                    return item.category === 'Linears';
-                  }
-                  if (section.key === 'Downlights / Spotlights') {
+                        return (
+                          <button
+                            key={sec.key}
+                            onClick={() => setSelectedCategoryFilter(sec.key)}
+                            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                              selectedCategoryFilter === sec.key
+                                ? 'bg-amber-400 text-slate-950 font-bold shadow-sm'
+                                : 'bg-purple-950/60 text-purple-300 hover:text-white border border-purple-900/60'
+                            }`}
+                          >
+                            {sec.title} ({count})
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Category Tables */}
+                <div className="space-y-6">
+                  {categorySections.map((section) => {
+                    const catItems = filteredItems.filter((item) => {
+                      if (section.key === 'Linears') {
+                        return item.category === 'Linears' || item.category === 'Flexum' || item.category === 'Svelte';
+                      }
+                      if (section.key === 'Downlights & Spotlights') {
+                        return (
+                          item.category === 'Downlights & Spotlights' ||
+                          item.category === 'Downlights / Spotlights' ||
+                          (item.category as any) === 'Downlights' ||
+                          (item.category as any) === 'Spotlights'
+                        );
+                      }
+                      if (section.key === 'Power Supplies') {
+                        return (
+                          item.category === 'Power Supplies' ||
+                          (item.category as any) === 'LED Drivers'
+                        );
+                      }
+                      return item.category === section.key;
+                    });
+
                     return (
-                      item.category === 'Downlights / Spotlights' ||
-                      item.category === ('Downlights' as any) ||
-                      item.category === ('Spotlights' as any)
+                      <CategoryTable
+                        key={section.key}
+                        categoryTitle={section.title}
+                        categoryKey={section.key}
+                        items={catItems}
+                        isConsolidated={isConsolidatedView}
+                        onEditItem={handleOpenEditModal}
+                        onDeleteItem={handleDeleteItem}
+                        onAddItem={handleOpenAddModal}
+                      />
                     );
-                  }
-                  if (section.key === 'Power Supplies') {
-                    return (
-                      item.category === 'Power Supplies' ||
-                      item.category === ('LED Drivers' as any)
-                    );
-                  }
-                  return item.category === section.key;
-                });
+                  })}
+                </div>
 
-                return (
-                  <CategoryTable
-                    key={section.key}
-                    categoryTitle={section.title}
-                    categoryKey={section.key}
-                    items={catItems}
-                    isConsolidated={isConsolidatedView}
-                    onEditItem={handleOpenEditModal}
-                    onDeleteItem={handleDeleteItem}
-                    onAddItem={handleOpenAddModal}
+                {/* Consolidated Material Summary Section */}
+                <ConsolidatedSummaryTable items={ocData.items} />
+
+                {/* Off-screen Document for PDF DOM Capture in Matrix Mode */}
+                <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '960px' }} aria-hidden="true">
+                  <OCMaterialSummaryDocument
+                    header={ocData.header}
+                    items={ocData.items}
+                    isEditable={false}
                   />
-                );
-              })}
-            </div>
-
-            {/* Consolidated Material Summary Section */}
-            <ConsolidatedSummaryTable items={ocData.items} />
+                </div>
+              </div>
+            )}
 
             {/* Bottom Generate PDF Action Banner */}
             <div className="p-6 bg-gradient-to-r from-purple-950 via-[#1C122E] to-purple-950 border border-purple-800/80 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
@@ -329,19 +459,30 @@ export default function App() {
                   Ready to Export Production Order Summary?
                 </h3>
                 <p className="text-xs text-purple-300/80">
-                  Generates an A4 PDF with dark purple headers, gold trims, and separated category tables.
+                  Generates an executive PDF formatted cleanly with dynamic naming: [{ocData.header.projectName || 'Project'} - Summary.pdf]
                 </p>
               </div>
 
-              <button
-                id="footer-generate-pdf-btn"
-                onClick={handleGeneratePDF}
-                disabled={isGeneratingPDF}
-                className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-bold text-sm shadow-xl shadow-amber-950/60 transition-all transform active:scale-98 disabled:opacity-50"
-              >
-                <Download className="w-5 h-5" />
-                <span>{isGeneratingPDF ? 'Generating Document...' : 'Generate & Download PDF'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  id="footer-preview-pdf-btn"
+                  onClick={() => setIsPdfPreviewOpen(true)}
+                  className="inline-flex items-center space-x-2 px-5 py-3 rounded-xl bg-purple-950/90 hover:bg-purple-900 border border-amber-500/50 text-amber-300 hover:text-amber-200 font-bold text-sm shadow-md transition-all active:scale-98"
+                >
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  <span>Preview PDF</span>
+                </button>
+
+                <button
+                  id="footer-generate-pdf-btn"
+                  onClick={handleGeneratePDF}
+                  disabled={isGeneratingPDF}
+                  className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-bold text-sm shadow-xl shadow-amber-950/60 transition-all transform active:scale-98 disabled:opacity-50"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>{isGeneratingPDF ? 'Generating Document...' : 'Generate & Download PDF'}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -356,11 +497,21 @@ export default function App() {
         onClose={() => setIsEditorOpen(false)}
       />
 
+      {/* Interactive Live PDF Preview Modal */}
+      {ocData && (
+        <PdfPreviewModal
+          isOpen={isPdfPreviewOpen}
+          onClose={() => setIsPdfPreviewOpen(false)}
+          header={ocData.header}
+          items={ocData.items}
+        />
+      )}
+
       {/* Footer */}
       <footer className="border-t border-purple-900/40 bg-[#09060F] py-6 mt-12 text-center text-xs text-purple-400/60">
         <p>Hazel OC Assistant • Professional Lighting Order Confirmation Processing System</p>
         <p className="mt-1 text-[11px] text-purple-500/50">
-          Enforcing strict specification isolation for Purchase, Production & Quality Control
+          Enforcing strict specification isolation for Purchase, Production &amp; Quality Control
         </p>
       </footer>
     </div>

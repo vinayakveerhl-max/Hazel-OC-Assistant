@@ -135,7 +135,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
 
       if (!response.ok || result.success === false) {
         let errMessage = result.error || `HTTP error ${response.status}: ${response.statusText}`;
-        if (result.details && result.details !== result.error) {
+        if (result.details && result.details !== result.error && !result.details.includes('<html') && !result.details.includes('<!DOCTYPE')) {
           errMessage += ` (${result.details})`;
         }
         throw new Error(errMessage);
@@ -143,7 +143,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
 
       if (!result.items || result.items.length === 0) {
         throw new Error(
-          'Gemini processed the document, but no lighting items or line specifications were found. Please confirm the document is a valid Order Confirmation.'
+          'The document was processed, but no lighting items or specifications were identified. Please verify that this is a valid Order Confirmation PDF.'
         );
       }
 
@@ -151,27 +151,43 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     } catch (err: any) {
       clearInterval(stepInterval);
       console.error('Extraction failure:', err);
-      setErrorMessage(err.message || 'An unexpected error occurred while processing the PDF with Gemini.');
+      let rawMsg = err.message || 'An unexpected error occurred while processing the PDF.';
+      
+      // Clean raw HTML, JSON, or stack traces
+      if (rawMsg.includes('<!DOCTYPE') || rawMsg.includes('<html') || rawMsg.includes('502 Bad Gateway') || rawMsg.includes('504 Gateway')) {
+        rawMsg = 'The extraction server temporarily timed out. Your PDF is ready—please click "Start Extraction" to retry.';
+      } else if (rawMsg.includes('503') || rawMsg.includes('UNAVAILABLE') || rawMsg.includes('high demand') || rawMsg.includes('resource exhausted') || rawMsg.includes('429')) {
+        rawMsg = 'The AI document engine is currently experiencing high demand. Please click "Start Extraction" to retry in a moment.';
+      } else if (rawMsg.startsWith('{') && rawMsg.includes('"error"')) {
+        try {
+          const parsed = JSON.parse(rawMsg);
+          rawMsg = parsed.error?.message || parsed.error || 'The document engine reported an error processing this PDF.';
+        } catch {
+          rawMsg = 'An error occurred while parsing the document response. Please try again.';
+        }
+      }
+      
+      setErrorMessage(rawMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLoadSample = () => {
+  const handleLoadSample = (sampleData: ExtractedOCResult = SAMPLE_LIGHTING_OC) => {
     setIsLoading(true);
     setErrorMessage(null);
     setExtractionStage(0);
 
     const stepInterval = setInterval(() => {
       setExtractionStage((prev) => (prev < 3 ? prev + 1 : prev));
-    }, 450);
+    }, 400);
 
     setTimeout(() => {
       clearInterval(stepInterval);
       setExtractionStage(3);
-      onExtractSuccess(SAMPLE_LIGHTING_OC);
+      onExtractSuccess(sampleData);
       setIsLoading(false);
-    }, 1600);
+    }, 1400);
   };
 
   return (
@@ -290,7 +306,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
               </>
             )}
 
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
               {selectedFile ? (
                 <button
                   id="extract-selected-pdf-btn"
@@ -311,7 +327,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
-                  className="px-5 py-2 bg-purple-900/60 hover:bg-purple-800/80 text-purple-100 font-medium text-xs rounded-xl border border-purple-700/60 transition-colors"
+                  className="px-4 py-2 bg-purple-900/60 hover:bg-purple-800/80 text-purple-100 font-medium text-xs rounded-xl border border-purple-700/60 transition-colors"
                 >
                   Select PDF Document
                 </button>
@@ -322,12 +338,12 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleLoadSample();
+                  handleLoadSample(SAMPLE_LIGHTING_OC);
                 }}
-                className="px-4 py-2 bg-purple-950/80 hover:bg-purple-900/80 text-amber-300/90 hover:text-amber-200 font-medium text-xs rounded-xl border border-amber-500/30 transition-colors flex items-center space-x-1.5"
+                className="px-3.5 py-2 bg-purple-950/80 hover:bg-purple-900/80 text-amber-300/90 hover:text-amber-200 font-medium text-xs rounded-xl border border-amber-500/30 transition-colors flex items-center space-x-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Load Sample Lighting OC (Instant Demo)</span>
+                <span>Try Sample OC</span>
               </button>
             </div>
           </div>

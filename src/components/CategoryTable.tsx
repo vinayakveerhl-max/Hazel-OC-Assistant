@@ -425,7 +425,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
       {/* Responsive Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full text-left text-xs border-collapse min-w-[850px]">
           <thead className="bg-[#1C142E] text-purple-300/90 font-semibold border-b border-purple-900/60 uppercase tracking-wider text-[10.5px]">
             {renderTableHead()}
           </thead>

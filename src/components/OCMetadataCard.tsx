@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { OCHeader } from '../types';
-import { Building2, Calendar, FileCheck, Hash, User, Edit3, Check, MapPin } from 'lucide-react';
+import { Building2, Calendar, FileCheck, Hash, User, Edit3, Check, MapPin, DollarSign, Package } from 'lucide-react';
 
 interface OCMetadataCardProps {
   header: OCHeader;
@@ -49,7 +49,7 @@ export const OCMetadataCard: React.FC<OCMetadataCardProps> = ({
               )}
             </h3>
             <p className="text-xs text-purple-300/70">
-              Header specifications mapped for Purchase, QC & Production
+              Header specifications mapped for Purchase, QC &amp; Production
             </p>
           </div>
         </div>
@@ -95,7 +95,7 @@ export const OCMetadataCard: React.FC<OCMetadataCardProps> = ({
 
       {/* Form Content / View Content */}
       {isEditing ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 text-xs">
           <div>
             <label className="block text-purple-300 font-medium mb-1">Customer / Client</label>
             <input
@@ -117,11 +117,21 @@ export const OCMetadataCard: React.FC<OCMetadataCardProps> = ({
           </div>
 
           <div>
-            <label className="block text-purple-300 font-medium mb-1">OC Number</label>
+            <label className="block text-purple-300 font-medium mb-1">OC Reference / Number</label>
             <input
               type="text"
               value={formState.ocNumber}
               onChange={(e) => setFormState({ ...formState, ocNumber: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-purple-300 font-medium mb-1">PO Number</label>
+            <input
+              type="text"
+              value={formState.poNumber || ''}
+              onChange={(e) => setFormState({ ...formState, poNumber: e.target.value })}
               className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
             />
           </div>
@@ -137,84 +147,115 @@ export const OCMetadataCard: React.FC<OCMetadataCardProps> = ({
           </div>
 
           <div>
-            <label className="block text-purple-300 font-medium mb-1">Ref / Quotation / PO No</label>
+            <label className="block text-purple-300 font-medium mb-1">Delivery Date</label>
             <input
               type="text"
-              value={formState.referenceNumber}
-              onChange={(e) => setFormState({ ...formState, referenceNumber: e.target.value })}
+              value={formState.deliveryDate || ''}
+              onChange={(e) => setFormState({ ...formState, deliveryDate: e.target.value })}
               className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
             />
           </div>
 
           <div>
-            <label className="block text-purple-300 font-medium mb-1">Prepared By</label>
+            <label className="block text-purple-300 font-medium mb-1">OC Total Amount</label>
             <input
               type="text"
-              value={formState.preparedBy || ''}
-              onChange={(e) => setFormState({ ...formState, preparedBy: e.target.value })}
+              value={formState.totalAmount || ''}
+              onChange={(e) => setFormState({ ...formState, totalAmount: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-purple-300 font-medium mb-1">Material Items Summary</label>
+            <input
+              type="text"
+              value={formState.materialItemsSummary || ''}
+              placeholder="e.g. 16 + freight"
+              onChange={(e) => setFormState({ ...formState, materialItemsSummary: e.target.value })}
               className="w-full px-3 py-2 bg-[#1B142D] border border-purple-800/80 rounded-lg text-white focus:outline-none focus:border-amber-400"
             />
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 text-xs">
-          <div className="p-3 bg-[#181126] rounded-xl border border-purple-900/40">
-            <span className="text-[11px] font-medium text-purple-400/80 uppercase tracking-wider block mb-1">
-              Customer / Client
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 text-xs">
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              Project
             </span>
-            <div className="flex items-center space-x-2 text-white font-semibold">
-              <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="truncate">{header.customerName || '—'}</span>
-            </div>
-          </div>
-
-          <div className="p-3 bg-[#181126] rounded-xl border border-purple-900/40">
-            <span className="text-[11px] font-medium text-purple-400/80 uppercase tracking-wider block mb-1">
-              Project Name
-            </span>
-            <div className="flex items-center space-x-2 text-white font-semibold">
-              <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex items-center space-x-1.5 text-white font-semibold">
+              <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span className="truncate">{header.projectName || '—'}</span>
             </div>
           </div>
 
-          <div className="p-3 bg-[#181126] rounded-xl border border-purple-900/40">
-            <span className="text-[11px] font-medium text-purple-400/80 uppercase tracking-wider block mb-1">
-              OC Number
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              Client
             </span>
-            <div className="flex items-center space-x-2 text-white font-semibold">
-              <Hash className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="truncate font-mono">{header.ocNumber || '—'}</span>
+            <div className="flex items-center space-x-1.5 text-white font-semibold">
+              <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">{header.customerName || '—'}</span>
             </div>
           </div>
 
-          <div className="p-3 bg-[#181126] rounded-xl border border-purple-900/40">
-            <span className="text-[11px] font-medium text-purple-400/80 uppercase tracking-wider block mb-1">
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              OC Reference
+            </span>
+            <div className="flex items-center space-x-1.5 text-white font-semibold font-mono">
+              <Hash className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">{header.ocNumber || header.referenceNumber || '—'}</span>
+            </div>
+          </div>
+
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              PO Number
+            </span>
+            <div className="flex items-center space-x-1.5 text-white font-semibold font-mono">
+              <FileCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">{header.poNumber || '—'}</span>
+            </div>
+          </div>
+
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
               OC Date
             </span>
-            <div className="flex items-center space-x-2 text-white font-semibold">
-              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex items-center space-x-1.5 text-white font-semibold">
+              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span className="truncate">{header.ocDate || '—'}</span>
             </div>
           </div>
 
-          <div className="p-3 bg-[#181126] rounded-xl border border-purple-900/40">
-            <span className="text-[11px] font-medium text-purple-400/80 uppercase tracking-wider block mb-1">
-              Reference / PO No.
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              Delivery Date
             </span>
-            <div className="flex items-center space-x-2 text-white font-semibold">
-              <FileCheck className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="truncate">{header.referenceNumber || '—'}</span>
+            <div className="flex items-center space-x-1.5 text-white font-semibold">
+              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">{header.deliveryDate || '—'}</span>
             </div>
           </div>
 
-          <div className="p-3 bg-[#181126] rounded-xl border border-purple-900/40">
-            <span className="text-[11px] font-medium text-purple-400/80 uppercase tracking-wider block mb-1">
-              Prepared By
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              OC Amount
             </span>
-            <div className="flex items-center space-x-2 text-white font-semibold">
-              <User className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="truncate">{header.preparedBy || 'Hazel Technical Desk'}</span>
+            <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold font-mono">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">{header.totalAmount || '—'}</span>
+            </div>
+          </div>
+
+          <div className="p-2.5 bg-[#181126] rounded-xl border border-purple-900/40">
+            <span className="text-[10px] font-medium text-purple-400/80 uppercase tracking-wider block mb-0.5">
+              Material Items
+            </span>
+            <div className="flex items-center space-x-1.5 text-amber-300 font-semibold">
+              <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">{header.materialItemsSummary || `${totalItemsCount} items`}</span>
             </div>
           </div>
         </div>

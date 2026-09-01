@@ -1,14 +1,16 @@
 export type LightingCategory =
   | 'Power Supplies'
   | 'Linears'
-  | 'Downlights / Spotlights'
   | 'Profiles'
+  | 'Downlights & Spotlights'
+  | 'Downlights / Spotlights'
   | 'Grids'
   | 'Diffusers'
   | 'Connectors'
   | 'Accessories / Other Items'
   | 'Flexum'
   | 'Svelte'
+  | 'Freight & Exclusions'
   | 'Other Lighting Products';
 
 export interface OCHeader {
@@ -16,10 +18,13 @@ export interface OCHeader {
   projectName: string;
   ocNumber: string;
   ocDate: string;
+  deliveryDate?: string;
+  poNumber?: string;
   referenceNumber: string;
   billingAddress?: string;
   shippingAddress?: string;
   totalAmount?: string;
+  materialItemsSummary?: string;
   preparedBy?: string;
   currency?: string;
   notes?: string;
@@ -44,10 +49,12 @@ export interface OCLineItem {
   powerSupplyType: string;
   driverType: string;
   dimming: string;
+  connection?: string; // e.g. "Remote", "Integral"
   quantity: number;
   unit: string;
   remarks: string;
   originalDescription: string;
+  isExcluded?: boolean;
   confidence?: 'high' | 'medium' | 'low';
   uncertainFields?: string[];
   isScannedOcr?: boolean;
@@ -57,6 +64,7 @@ export interface ConsolidatedSummaryItem {
   id: string;
   category: LightingCategory;
   itemName: string;
+  clientCode?: string;
   specification: string;
   totalQuantity: number;
   unit: string;
@@ -72,3 +80,4 @@ export interface ExtractedOCResult {
   isScanned?: boolean;
   totalPages?: number;
 }
+

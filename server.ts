@@ -36,8 +36,8 @@ async function startServer() {
     });
   });
 
-  // 2. Primary Server-Side Extraction Route - Receives original PDF and passes directly to Gemini
-  app.post('/api/extract-oc', async (req, res) => {
+  // 2. Primary Server-Side Extraction Route (handles both /api/extract-oc and /api/extract)
+  const handleExtractRequest = async (req: express.Request, res: express.Response) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
     try {
@@ -45,7 +45,7 @@ async function startServer() {
       const originalFilename = filename || 'document.pdf';
 
       if (!pdfBase64 || typeof pdfBase64 !== 'string') {
-        console.warn('[API /api/extract-oc] Missing pdfBase64 in request body');
+        console.warn('[API Extraction] Missing pdfBase64 in request body');
         return res.status(400).json({
           success: false,
           error: 'No PDF data received. Please provide valid base64-encoded PDF data.',
@@ -58,7 +58,7 @@ async function startServer() {
       const result = await processPdfExtraction(cleanBase64, originalFilename);
       return res.status(200).json(result);
     } catch (err: any) {
-      console.error('[Hazel OC] Error in /api/extract-oc:', err);
+      console.error('[Hazel OC] Error in extraction handler:', err);
       const status = err.message?.includes('503') ? 503 : err.message?.includes('429') ? 429 : 500;
       return res.status(status).json({
         success: false,
@@ -67,7 +67,10 @@ async function startServer() {
         details: String(err),
       });
     }
-  });
+  };
+
+  app.post('/api/extract-oc', handleExtractRequest);
+  app.post('/api/extract', handleExtractRequest);
 
   // 3. Catch-all for any unmatched /api/* routes - GUARANTEES JSON (NEVER falls through to Vite HTML)
   app.all('/api/*', (req, res) => {
