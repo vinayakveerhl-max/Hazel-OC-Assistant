@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { processPdfExtraction } from '../src/server/extractService';
+import { processPdfExtraction } from '../src/server/extractService.js';
 
 /**
  * Serverless / API Route handler for /api/extract

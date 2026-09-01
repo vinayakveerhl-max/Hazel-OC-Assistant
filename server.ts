@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { processPdfExtraction } from './src/server/extractService';
+import { processPdfExtraction } from './src/server/extractService.js';
 
 const PORT = 3000;
 
