@@ -6,6 +6,10 @@ import {
   consolidateCategoryItems,
   generateConsolidatedSummary,
   isFreightOrExcluded,
+  isDownlightOrFixture,
+  sanitizeClientName,
+  sanitizeTotalAmount,
+  resolveDimmingControl,
 } from './consolidation';
 
 // Safe helper for autoTable invocation across different bundler environments
@@ -277,8 +281,11 @@ export function buildLightingSummaryPDF(header: OCHeader, rawItems: OCLineItem[]
     doc.text(cleanVal, x, valY, { maxWidth: maxValWidth });
   };
 
+  const cleanCustomerName = sanitizeClientName(header.customerName);
+  const cleanTotalAmount = sanitizeTotalAmount(header.totalAmount);
+
   // Row 1
-  renderField('Client / Customer', header.customerName || '—', colX[0], currentY + 10.5, currentY + 14.5);
+  renderField('Client / Customer', cleanCustomerName || '—', colX[0], currentY + 10.5, currentY + 14.5);
   renderField('Project Name', header.projectName || '—', colX[1], currentY + 10.5, currentY + 14.5);
   renderField('OC Number', header.ocNumber || '—', colX[2], currentY + 10.5, currentY + 14.5);
   renderField('OC Date', header.ocDate || '—', colX[3], currentY + 10.5, currentY + 14.5);
@@ -287,7 +294,7 @@ export function buildLightingSummaryPDF(header: OCHeader, rawItems: OCLineItem[]
   renderField('Ref / Quote No', header.referenceNumber || '—', colX[0], currentY + 19.5, currentY + 23.5);
   renderField('Total Material Items', `${materialItems.length} Extracted Items`, colX[1], currentY + 19.5, currentY + 23.5);
   renderField('Delivery Date', header.deliveryDate || '—', colX[2], currentY + 19.5, currentY + 23.5);
-  renderField('OC Amount', header.totalAmount || '—', colX[3], currentY + 19.5, currentY + 23.5);
+  renderField('OC Amount', cleanTotalAmount || '—', colX[3], currentY + 19.5, currentY + 23.5);
 
   currentY += cardHeight + 6;
 
@@ -469,12 +476,13 @@ export function buildLightingSummaryPDF(header: OCHeader, rawItems: OCLineItem[]
       i.category === 'Downlights & Spotlights' ||
       i.category === 'Downlights / Spotlights' ||
       i.category === ('Downlights' as any) ||
-      i.category === ('Spotlights' as any)
+      i.category === ('Spotlights' as any) ||
+      isDownlightOrFixture(i)
   );
   const downlightItems = consolidateCategoryItems(rawDownlightItems);
 
   if (downlightItems.length > 0) {
-    addSectionTitle('Downlights & Spotlights', downlightItems.length);
+    addSectionTitle('Downlights, Spotlights & Wall Fixtures', downlightItems.length);
 
     const head = [['Sr.', 'OC Line Item(s)', 'Client Code', 'Item Name / Model', 'Wattage', 'CCT', 'CRI', 'Beam', 'Finish', 'IP', 'Qty', 'Unit', 'Remarks / Driver & Louver']];
     const body = downlightItems.map((item, idx) => [
@@ -519,7 +527,9 @@ export function buildLightingSummaryPDF(header: OCHeader, rawItems: OCLineItem[]
   }
 
   // 4.4 ALUMINUM PROFILES (CONSOLIDATED)
-  const rawProfileItems = materialItems.filter((i) => i.category === 'Profiles' || i.profileType?.length > 1);
+  const rawProfileItems = materialItems.filter(
+    (i) => (i.category === 'Profiles' || i.profileType?.length > 1) && !isDownlightOrFixture(i)
+  );
   const profileItems = consolidateCategoryItems(rawProfileItems);
 
   if (profileItems.length > 0) {

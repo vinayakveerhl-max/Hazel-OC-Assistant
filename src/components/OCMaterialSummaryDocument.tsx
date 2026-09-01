@@ -4,6 +4,10 @@ import {
   generateConsolidatedSummary,
   consolidateCategoryItems,
   isFreightOrExcluded,
+  isDownlightOrFixture,
+  sanitizeClientName,
+  sanitizeTotalAmount,
+  resolveDimmingControl,
 } from '../utils/consolidation';
 import { Edit2, Trash2, Plus, Info } from 'lucide-react';
 
@@ -45,16 +49,18 @@ export const OCMaterialSummaryDocument: React.FC<OCMaterialSummaryDocumentProps>
   const linearItems = consolidateCategoryItems(rawLinearItems);
 
   const rawProfileItems = materialItems.filter(
-    (i) => i.category === 'Profiles' || i.profileType?.length > 1
+    (i) => (i.category === 'Profiles' || i.profileType?.length > 1) && !isDownlightOrFixture(i)
   );
   const profileItems = consolidateCategoryItems(rawProfileItems);
 
+  // Categorize downlights, spotlights, and wall fixtures (like Willow Point R 3066)
   const rawDownlightItems = materialItems.filter(
     (i) =>
       i.category === 'Downlights & Spotlights' ||
       i.category === 'Downlights / Spotlights' ||
       i.category === ('Downlights' as any) ||
-      i.category === ('Spotlights' as any)
+      i.category === ('Spotlights' as any) ||
+      isDownlightOrFixture(i)
   );
   const downlightItems = consolidateCategoryItems(rawDownlightItems);
 
@@ -91,6 +97,9 @@ export const OCMaterialSummaryDocument: React.FC<OCMaterialSummaryDocumentProps>
       ? `Freight line item ${excludedLines} is excluded from material extraction/consolidation.`
       : 'Freight and transport line items are excluded from material extraction/consolidation.';
 
+  const cleanClientName = sanitizeClientName(header.customerName);
+  const cleanTotalAmount = sanitizeTotalAmount(header.totalAmount);
+
   return (
     <div className="oc-container shadow-md border border-slate-200" id="printable-oc-summary">
       {/* Document Header */}
@@ -107,7 +116,7 @@ export const OCMaterialSummaryDocument: React.FC<OCMaterialSummaryDocumentProps>
         </div>
         <div className="header-item">
           <span className="label">Client:</span>
-          <span className="value font-semibold text-slate-900">{header.customerName || '—'}</span>
+          <span className="value font-semibold text-slate-900">{cleanClientName || '—'}</span>
         </div>
         <div className="header-item">
           <span className="label">OC Date:</span>
@@ -127,7 +136,7 @@ export const OCMaterialSummaryDocument: React.FC<OCMaterialSummaryDocumentProps>
         </div>
         <div className="header-item">
           <span className="label">OC Amount:</span>
-          <span className="value font-semibold text-emerald-800">{header.totalAmount || '—'}</span>
+          <span className="value font-semibold text-emerald-800">{cleanTotalAmount || '—'}</span>
         </div>
         <div className="header-item">
           <span className="label">Material Items:</span>

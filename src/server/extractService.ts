@@ -299,7 +299,7 @@ Return the final result strictly as a valid JSON object matching the requested s
   }
 
   const document: ExtractionDocument = {
-    client: parsed.document?.client || '',
+    client: parsed.document?.client ? parsed.document.client.replace(/\bLimted\b/gi, 'Limited').replace(/\bLmted\b/gi, 'Limited') : '',
     project: parsed.document?.project || '',
     reference_number: parsed.document?.reference_number || '',
     oc_date: parsed.document?.oc_date || '',
@@ -321,9 +321,52 @@ Return the final result strictly as a valid JSON object matching the requested s
       : [String(item.line_item_numbers || idx + 1)];
     const lineNumStr = lineNums.join(', ');
 
+    const descText = [
+      item.driver,
+      item.item_name,
+      item.full_specification,
+      item.comments
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    let resolvedDimming = 'Non-Dimmable';
+    if (
+      descText.includes('non dim') ||
+      descText.includes('non-dim') ||
+      descText.includes('nondim') ||
+      descText.includes('non dimmable') ||
+      descText.includes('non-dimmable') ||
+      descText.includes('nondimmable')
+    ) {
+      resolvedDimming = 'Non-Dimmable';
+    } else if (descText.includes('dali-2') || descText.includes('dali 2')) {
+      resolvedDimming = 'DALI-2';
+    } else if (descText.includes('dali')) {
+      resolvedDimming = 'DALI';
+    } else if (descText.includes('0-10v') || descText.includes('1-10v')) {
+      resolvedDimming = '0-10V';
+    } else if (descText.includes('triac') || descText.includes('phase')) {
+      resolvedDimming = 'Phase-Cut';
+    } else if (descText.includes('dimmable') || descText.includes('dimming') || descText.includes('dim')) {
+      resolvedDimming = 'Dimmable';
+    }
+
+    // Auto-categorize wall light fixtures (e.g. Willow Point R 3066)
+    let assignedCategory = item.category || 'Other Lighting Products';
+    const isWallOrDownlight =
+      descText.includes('willow') ||
+      descText.includes('point r') ||
+      descText.includes('downlight') ||
+      descText.includes('spotlight') ||
+      descText.includes('wall light') ||
+      descText.includes('wall sconce') ||
+      descText.includes('wall washer');
+    if (isWallOrDownlight && (assignedCategory === 'Accessories / Other Items' || assignedCategory === 'Other Lighting Products')) {
+      assignedCategory = 'Downlights & Spotlights';
+    }
+
     return {
       id: `oc-item-${Date.now()}-${idx + 1}`,
-      category: item.category || 'Other Lighting Products',
+      category: assignedCategory,
       line_item_numbers: lineNums,
       lineItemNumber: lineNumStr,
       client_code: item.client_code || '',
@@ -341,11 +384,11 @@ Return the final result strictly as a valid JSON object matching the requested s
       ipRating: item.ip_rating || '—',
       length: item.length || '',
       dimensions: item.length || '—',
-      profileType: item.category === 'Profiles' ? item.item_name : '—',
-      powerSupplyType: item.category === 'Power Supplies' ? (item.driver || item.item_name) : '—',
+      profileType: assignedCategory === 'Profiles' ? item.item_name : '—',
+      powerSupplyType: assignedCategory === 'Power Supplies' ? (item.driver || item.item_name) : '—',
       driver: item.driver || '',
       driverType: item.driver || '—',
-      dimming: item.driver?.toLowerCase().includes('dali') ? 'DALI' : item.driver?.toLowerCase().includes('dim') ? 'Dimmable' : 'Non-Dim',
+      dimming: resolvedDimming,
       quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
       unit: item.unit || 'Nos',
       comments: item.comments || '',

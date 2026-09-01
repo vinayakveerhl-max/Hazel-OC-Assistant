@@ -7,6 +7,152 @@ import { OCLineItem, ConsolidatedSummaryItem } from '../types';
 export const norm = (v: any): string => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 /**
+ * Automatically sanitizes client and company names (e.g. fixes common typos like "Limted" -> "Limited").
+ */
+export function sanitizeClientName(name: string | undefined | null): string {
+  if (!name) return '';
+  let str = String(name).trim();
+  // Fix common OCR / transcription typos in company names
+  str = str.replace(/\bLimted\b/gi, 'Limited');
+  str = str.replace(/\bLmted\b/gi, 'Limited');
+  str = str.replace(/\bLt\b/gi, 'Ltd');
+  str = str.replace(/\bPv\b/gi, 'Pvt');
+  str = str.replace(/\bCorpration\b/gi, 'Corporation');
+  return str.replace(/\s+/g, ' ');
+}
+
+/**
+ * Automatically sanitizes total OC financial amounts to prevent duplicated leading digits or corrupt symbols.
+ */
+export function sanitizeTotalAmount(amt: string | undefined | null): string {
+  if (!amt) return '—';
+  let str = String(amt).trim();
+  if (!str || str === '—' || str === '-') return '—';
+
+  // Check if currency symbol is present
+  const hasRupee = str.includes('₹') || str.toUpperCase().includes('INR') || str.toUpperCase().includes('RS');
+  const currencySymbol = str.includes('$') ? '$' : str.includes('€') ? '€' : str.includes('£') ? '£' : hasRupee ? '₹' : '';
+
+  // Extract pure numeric characters, commas, and dots
+  const match = str.match(/[0-9][0-9,.]*/);
+  if (!match) return str;
+
+  let numStr = match[0];
+
+  // Detect duplicated leading prefix digits (e.g., "77,14,685.00" when the real value is "7,14,685.00" or duplicated first char before standard Indian/Western format)
+  // Check Indian numbering system: 1-2 digits, then 2 digits groups, then 3 digits: e.g. 7,14,685.00
+  // If first group has identical repeating digits before comma like "77,14,685.00" where the original was "7,14,685.00"
+  if (/^(\d)\1,(\d{2}),(\d{3}(?:\.\d{2})?)$/.test(numStr)) {
+    // Duplicated single digit prefix before comma
+    numStr = numStr.slice(1);
+  }
+
+  return currencySymbol ? `${currencySymbol}${numStr}` : numStr;
+}
+
+/**
+ * Resolves dimming/control protocol strictly:
+ * Items with "Non Dimmable", "Non-Dimmable", or "Non Dim" in their description, remarks, or driver spec
+ * MUST return "Non-Dimmable" and NEVER map to "Dimmable".
+ */
+export function resolveDimmingControl(item: Partial<OCLineItem>): string {
+  const combined = [
+    item.dimming,
+    item.driverType,
+    (item as any).driver,
+    item.itemName,
+    item.powerSupplyType,
+    item.originalDescription,
+    item.remarks
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  // Strict check for Non-Dimmable FIRST
+  if (
+    combined.includes('non dim') ||
+    combined.includes('non-dim') ||
+    combined.includes('nondim') ||
+    combined.includes('non dimmable') ||
+    combined.includes('non-dimmable') ||
+    combined.includes('nondimmable') ||
+    combined.includes('fixed output') ||
+    combined.includes('on/off') ||
+    combined.includes('on-off')
+  ) {
+    return 'Non-Dimmable';
+  }
+
+  if (combined.includes('dali-2') || combined.includes('dali 2')) {
+    return 'DALI-2';
+  }
+  if (combined.includes('dali')) {
+    return 'DALI';
+  }
+  if (combined.includes('0-10v') || combined.includes('1-10v') || combined.includes('0/1-10v')) {
+    return '0-10V / 1-10V';
+  }
+  if (combined.includes('phase-cut') || combined.includes('triac') || combined.includes('trailing edge')) {
+    return 'Phase-Cut / TRIAC';
+  }
+  if (combined.includes('bluetooth') || combined.includes('casambi') || combined.includes('zigbee')) {
+    return 'Wireless / Smart';
+  }
+  if (combined.includes('dimmable') || combined.includes('dimming') || combined.includes('dim')) {
+    return 'Dimmable';
+  }
+
+  return item.dimming && item.dimming !== '—' ? item.dimming : 'Non-Dimmable';
+}
+
+/**
+ * Categorization helper:
+ * Ensures wall lights, downlights, spotlights, and surface/recessed luminaires
+ * (like Willow Point R 3066) are categorized under "Downlights & Spotlights" / Light Fixtures,
+ * NEVER falling through to "Accessories / Other Items".
+ */
+export function isDownlightOrFixture(item: OCLineItem): boolean {
+  const cat = norm(item.category);
+  if (
+    cat.includes('downlight') ||
+    cat.includes('spotlight') ||
+    cat.includes('spot') ||
+    cat.includes('light fixtures')
+  ) {
+    return true;
+  }
+
+  const text = [
+    item.itemName,
+    item.productCode,
+    item.originalDescription,
+    item.remarks
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return (
+    text.includes('willow') ||
+    text.includes('point r') ||
+    text.includes('downlight') ||
+    text.includes('spotlight') ||
+    text.includes('spot light') ||
+    text.includes('wall light') ||
+    text.includes('wall washer') ||
+    text.includes('wall sconce') ||
+    text.includes('ceiling light') ||
+    text.includes('recessed light') ||
+    text.includes('surface light') ||
+    text.includes('track light') ||
+    text.includes('accent light') ||
+    text.includes('cob') ||
+    text.includes('luminaire')
+  );
+}
+
+/**
  * Standardizes unit representations for consistent grouping and display.
  */
 export function normalizeUnit(unit: string | undefined | null): string {
@@ -136,7 +282,11 @@ export function formatSpecificationDetails(item: OCLineItem): string {
   if (item.driverType && item.driverType !== '—') tokens.push(item.driverType);
   if (item.dimensions && item.dimensions !== '—') tokens.push(item.dimensions);
   if (item.cri && item.cri !== '—') tokens.push(`CRI ${item.cri}`);
-  if (item.dimming && item.dimming !== '—' && item.dimming !== 'Non-Dim') tokens.push(item.dimming);
+  
+  const dimControl = resolveDimmingControl(item);
+  if (dimControl && dimControl !== '—' && dimControl !== 'Non-Dimmable' && dimControl !== 'Non-Dim') {
+    tokens.push(dimControl);
+  }
 
   if (tokens.length > 0) {
     return tokens.join(' | ');
@@ -154,11 +304,13 @@ export function consolidateCategoryItems(items: OCLineItem[]): OCLineItem[] {
   for (const item of items) {
     const key = getItemSpecKey(item);
     const itemQty = parseFloat(String(item.quantity || 0)) || 0;
+    const resolvedDim = resolveDimmingControl(item);
 
     if (!map.has(key)) {
       map.set(key, {
         ...item,
         quantity: itemQty,
+        dimming: resolvedDim,
         lineItemNumber: mergeLineNumbers(item.lineItemNumber),
         clientCode: mergeClientCodes(item.clientCode),
         unit: normalizeUnit(item.unit)
@@ -169,6 +321,9 @@ export function consolidateCategoryItems(items: OCLineItem[]): OCLineItem[] {
       existing.quantity = Math.round((existingQty + itemQty) * 10000) / 10000;
       existing.lineItemNumber = mergeLineNumbers(existing.lineItemNumber, item.lineItemNumber);
       existing.clientCode = mergeClientCodes(existing.clientCode, item.clientCode);
+      if (!existing.dimming || existing.dimming === '—') {
+        existing.dimming = resolvedDim;
+      }
     }
   }
 
@@ -197,10 +352,15 @@ export function generateConsolidatedSummary(items: OCLineItem[]): ConsolidatedSu
     const unit = normalizeUnit(item.unit);
     const specDetails = formatSpecificationDetails(item);
 
+    // Correct category if wall light was categorized under accessories
+    const correctedCategory = isDownlightOrFixture(item) && item.category === 'Accessories / Other Items'
+      ? 'Downlights & Spotlights'
+      : item.category;
+
     if (!map.has(key)) {
       map.set(key, {
         id: `summary-${item.id}`,
-        category: item.category,
+        category: correctedCategory,
         itemName: item.itemName || item.productCode || 'Lighting Material',
         clientCode: mergeClientCodes(item.clientCode),
         productCode: item.productCode || '—',
