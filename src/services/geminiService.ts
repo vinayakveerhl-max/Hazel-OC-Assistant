@@ -123,7 +123,8 @@ ${inputText}`,
     });
 
     const outputText = response.text || '{}';
-    const parsedData = JSON.parse(outputText);
+    const cleaned = outputText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsedData = JSON.parse(cleaned);
 
     // Post-process header strings
     const rawHeader = parsedData.header || {};
@@ -139,6 +140,11 @@ ${inputText}`,
 
     // Post-process and sanitize item fields
     const rawItems = Array.isArray(parsedData.items) ? parsedData.items : [];
+    if (rawItems.length === 0) {
+      throw new Error(
+        'The document was processed, but no lighting items or specifications were identified. Please verify that this is a valid Order Confirmation PDF.'
+      );
+    }
     const items: OCLineItem[] = rawItems.map((item: any) => ({
       ...item,
       lineItemNumber: cleanText(item.lineItemNumber),

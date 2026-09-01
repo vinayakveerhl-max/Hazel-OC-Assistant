@@ -274,12 +274,29 @@ Return the final result strictly as a valid JSON object matching the requested s
 
   if (!responseText) {
     console.error(`[Hazel OC] Gemini request failed across all models. Last error:`, lastGeminiError);
-    throw new Error(lastGeminiError?.message || 'Gemini API failed to process the PDF.');
+    const lastMsg = lastGeminiError?.message || (typeof lastGeminiError === 'object' ? JSON.stringify(lastGeminiError) : String(lastGeminiError));
+    throw new Error(lastMsg || 'Gemini API failed to process the PDF.');
   }
 
   console.log(`[Hazel OC] 4. JSON parsing Gemini response...`);
-  const cleaned = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-  const parsed = JSON.parse(cleaned);
+  let parsed: any;
+  try {
+    // Strip markdown code block wrappers (```json ... ``` or ``` ...)
+    const cleaned = responseText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    parsed = JSON.parse(cleaned);
+  } catch (parseErr: any) {
+    console.error(`[Hazel OC] JSON parse failed on Gemini response:`, responseText);
+    throw new Error(
+      `Failed to parse AI extraction response: ${parseErr?.message || 'Invalid JSON format'}. Raw response snippet: ${responseText.slice(0, 200)}`
+    );
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('AI extraction returned an empty or non-object response.');
+  }
 
   const document: ExtractionDocument = {
     client: parsed.document?.client || '',
@@ -292,6 +309,12 @@ Return the final result strictly as a valid JSON object matching the requested s
   };
 
   const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+  if (rawItems.length === 0) {
+    console.warn(`[Hazel OC] No lighting line items found in parsed output:`, parsed);
+    throw new Error(
+      'The document was processed, but no lighting items or specifications were identified. Please verify that this is a valid Order Confirmation PDF.'
+    );
+  }
   const items: ExtractionItem[] = rawItems.map((item: any, idx: number) => {
     const lineNums = Array.isArray(item.line_item_numbers)
       ? item.line_item_numbers.map((n: any) => String(n))

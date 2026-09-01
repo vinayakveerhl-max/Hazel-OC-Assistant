@@ -59,12 +59,17 @@ async function startServer() {
       return res.status(200).json(result);
     } catch (err: any) {
       console.error('[Hazel OC] Error in extraction handler:', err);
-      const status = err.message?.includes('503') ? 503 : err.message?.includes('429') ? 429 : 500;
+      const errorMsg =
+        typeof err === 'string'
+          ? err
+          : err?.message ||
+            (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      const status = errorMsg.includes('503') ? 503 : errorMsg.includes('429') ? 429 : 500;
       return res.status(status).json({
         success: false,
-        error: err.message || 'Gemini extraction failed.',
+        error: errorMsg || 'Gemini extraction failed.',
         code: status === 503 ? 'MODEL_503_UNAVAILABLE' : 'EXTRACTION_ERROR',
-        details: String(err),
+        details: typeof err?.stack === 'string' ? err.stack : String(err),
       });
     }
   };

@@ -35,10 +35,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(result);
   } catch (error: any) {
     console.error('[API /api/extract-oc] Extraction Error:', error);
+    const errorMsg =
+      typeof error === 'string'
+        ? error
+        : error?.message ||
+          (typeof error === 'object' ? JSON.stringify(error) : String(error));
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Extraction failed',
-      details: String(error),
+      error: errorMsg || 'Extraction failed',
+      details: typeof error?.stack === 'string' ? error.stack : String(error),
     });
   }
 }

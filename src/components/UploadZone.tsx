@@ -134,8 +134,25 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       }
 
       if (!response.ok || result.success === false) {
-        let errMessage = result.error || `HTTP error ${response.status}: ${response.statusText}`;
-        if (result.details && result.details !== result.error && !result.details.includes('<html') && !result.details.includes('<!DOCTYPE')) {
+        let errMessage = 'Extraction failed.';
+        if (typeof result.error === 'string' && result.error.trim()) {
+          errMessage = result.error;
+        } else if (result.error && typeof result.error === 'object') {
+          errMessage = result.error.message || JSON.stringify(result.error);
+        } else if (typeof result.details === 'string' && result.details.trim()) {
+          errMessage = result.details;
+        } else {
+          errMessage = `HTTP error ${response.status}: ${response.statusText}`;
+        }
+
+        if (
+          result.details &&
+          typeof result.details === 'string' &&
+          result.details !== errMessage &&
+          !result.details.includes('<html') &&
+          !result.details.includes('<!DOCTYPE') &&
+          !result.details.includes('Error:')
+        ) {
           errMessage += ` (${result.details})`;
         }
         throw new Error(errMessage);
@@ -151,7 +168,21 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     } catch (err: any) {
       clearInterval(stepInterval);
       console.error('Extraction failure:', err);
-      let rawMsg = err.message || 'An unexpected error occurred while processing the PDF.';
+      
+      let rawMsg: string = '';
+      if (typeof err === 'string') {
+        rawMsg = err;
+      } else if (err?.message && err.message !== '[object Object]' && !err.message.includes('[object Object]')) {
+        rawMsg = err.message;
+      } else if (typeof err === 'object') {
+        try {
+          rawMsg = JSON.stringify(err);
+        } catch {
+          rawMsg = 'An unexpected error occurred while processing the PDF.';
+        }
+      } else {
+        rawMsg = String(err || 'An unexpected error occurred.');
+      }
       
       // Clean raw HTML, JSON, or stack traces
       if (rawMsg.includes('<!DOCTYPE') || rawMsg.includes('<html') || rawMsg.includes('502 Bad Gateway') || rawMsg.includes('504 Gateway')) {
@@ -165,6 +196,10 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
         } catch {
           rawMsg = 'An error occurred while parsing the document response. Please try again.';
         }
+      }
+
+      if (rawMsg === '[object Object]' || rawMsg.includes('[object Object]') || !rawMsg.trim()) {
+        rawMsg = 'The document extraction service encountered an issue. Please verify your PDF and try uploading again.';
       }
       
       setErrorMessage(rawMsg);
